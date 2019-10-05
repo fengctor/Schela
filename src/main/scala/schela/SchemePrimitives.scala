@@ -73,6 +73,8 @@ object SchemePrimitives {
 
   private def cons(args: List[LispVal]): ThrowsError[LispVal] = args match {
     case List(x, LList(xs)) => LList(x :: xs).point[ThrowsError]
+    case List(x, y) => LDottedList(List(x), y).point[ThrowsError]
+    case argsMismatch => (NumArgs(2, argsMismatch): LispError).raiseError[ThrowsError, LispVal]
   }
 
   private def eqv(args: List[LispVal]): ThrowsError[LispVal] = args match {

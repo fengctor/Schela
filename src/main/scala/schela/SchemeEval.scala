@@ -23,6 +23,8 @@ object SchemeEval {
         val newerClosure = varargs.map(argName => bindVars(newClosure, List((argName, LList(givenVarargs))))).getOrElse(newClosure)
         body.traverse(eval(_, newerClosure.some)).map(_.last)
       }
+
+    case wrongType => (TypeMismatch("function", wrongType): LispError).raiseError[ThrowsError, LispVal]
   }
 
   def trapError(action: ThrowsError[String]): ThrowsError[String] =

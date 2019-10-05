@@ -18,8 +18,8 @@ object Parsez {
     def parse(s: S): List[(A, S)] = parseFn(s)
   }
 
-  def runParser[A](parser: Parsez[A], s: String): String \/ A =
-    parser.parse(s.toList) match {
+  def runParser[A](parser: Parsez[A], s: List[Char]): String \/ A =
+    parser.parse(s) match {
       case List((res, Nil)) => res.right
       case List((_, rs)) => "Stream left over".left
       case x => "Parser error".left

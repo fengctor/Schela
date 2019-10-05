@@ -77,7 +77,7 @@ object SchemeParse {
       (parseParenList <|> parseParenDottedList)
   }
 
-  def readExpr(s: String): ThrowsError[LispVal] = runParser(parseExpr, s) match {
+  def readExpr(s: List[Char]): ThrowsError[LispVal] = runParser(parseExpr, s) match {
     case -\/(err) => (Parser(err): LispError).raiseError[ThrowsError, LispVal]
     case \/-(value) => value.point[ThrowsError]
   }
