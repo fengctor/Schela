@@ -14,9 +14,9 @@ object LispVal {
     override def shows(f: LispVal): String = f match {
       case LAtom(name) => name.mkString
 
-      case LList(vs) => s"(${vs.map(shows).mkString(" ")})"
+      case LList(vs) => s"'(${vs.map(shows).mkString(" ")})"
 
-      case LDottedList(vs, v) => s"(${vs.map(shows).mkString(" ")} . ${shows(v)})"
+      case LDottedList(vs, v) => s"'(${vs.map(shows).mkString(" ")} . ${shows(v)})"
 
       case LNumber(n) => n.toString
 
@@ -33,6 +33,8 @@ object LispVal {
 
       case LFunc(args, varargs, body, _) =>
         s"(lambda (${args.mkString(" ")}${varargs.map(" . " + _).getOrElse("")}) ...)"
+
+      case LUnit() => ""
     }
   }
 }
@@ -55,3 +57,4 @@ final case class LFunc(
   body: List[LispVal],
   closure: mutable.Map[String, LispVal]
 ) extends LispVal
+final case class LUnit() extends LispVal

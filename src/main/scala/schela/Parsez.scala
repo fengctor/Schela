@@ -18,12 +18,21 @@ object Parsez {
     def parse(s: S): List[(A, S)] = parseFn(s)
   }
 
-  def runParser[A](parser: Parsez[A], s: List[Char]): String \/ A =
-    parser.parse(s) match {
+  def runParser[A](parser: Parsez[A], s: List[Char]): String \/ A = {
+    // TODO: make sure parens aren't mismatched before processing
+    def assimilateParens(text: List[Char]): List[Char] =
+      text.map {
+        case '[' => '('
+        case ']' => ')'
+        case c => c
+      }
+
+    parser.parse(assimilateParens(s)) match {
       case List((res, Nil)) => res.right
-      case List((_, rs)) => "Stream left over".left
-      case x => "Parser error".left
+      case List((_, rs)) => s"stream left over: ${rs.mkString}".left
+      case x => s"parser error: $x".left
     }
+  }
 
   val item: Parsez[Char] = Parsez {
     case Nil => Nil
@@ -94,13 +103,6 @@ object Parsez {
     a <- p
     _ <- sep
   } yield a)
-
-  /*def tryParse[A](p: Parser[A], fallBack: A): Parser[A] = Parser { s =>
-    p.parse(s) match {
-      case Nil => List((fallBack, s))
-      case List((as, s2)) => List((as, s2))
-    }
-  }*/
 
   def space: Parsez[Char] = oneOf(List(' ', '\t', '\n', '\r', '\f'))
 

@@ -68,6 +68,7 @@ object Repl {
     val parser: Parsez[List[LispVal]] = endBy(parseExpr, spaces)
     val srcOpt = fromFileOpt(fileStr)
     val inputOpt = srcOpt.map(_.toList)
+
     srcOpt.foreach(_.close())
 
     inputOpt match {
@@ -90,7 +91,7 @@ object Repl {
   def runRepl(): Unit = {
     print("Schela>>> ")
     val in: List[Char] = scala.io.StdIn.readLine().toList
-    if (in != "quit") {
+    if (in != "quit".toList) {
       val evaled = (readExpr(in) >>= (expr => eval(expr))).map(_.shows)
       println(extractValue(trapError(evaled)))
       runRepl()

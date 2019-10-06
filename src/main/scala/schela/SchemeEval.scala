@@ -54,8 +54,22 @@ object SchemeEval {
 
     case LList(List(LAtom(`if`), pred, ifTrue, ifFalse)) =>
       eval(pred, closure) >>= {
+        case LBool(true) => eval(ifTrue, closure)
         case LBool(false) => eval(ifFalse, closure)
-        case _ => eval(ifTrue, closure)
+        case _ => (TypeMismatch("bool", pred): LispError).raiseError[ThrowsError, LispVal]
+      }
+
+    case LList(List(LAtom(`cond`))) =>
+      LUnit().point[ThrowsError]
+
+    case LList(LAtom(`cond`) :: LList(List(LAtom(`else`), result)) :: _) =>
+      eval(result, closure)
+
+    case LList(LAtom(`cond`) :: LList(List(pred, result)) :: rest) =>
+      eval(pred, closure) >>= {
+        case LBool(true) => eval(result, closure)
+        case LBool(false) => eval(LList(LAtom(`cond`) :: rest), closure)
+        case _ => (TypeMismatch("bool", pred): LispError).raiseError[ThrowsError, LispVal]
       }
 
     case LList(List(LAtom(`set!`), LAtom(name), form)) =>
