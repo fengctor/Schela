@@ -1,7 +1,10 @@
 package schela
 
-import scala.io.Source._
+import java.io.FileNotFoundException
+
+import scala.io.BufferedSource
 import scala.collection._
+
 import scalaz._
 import Scalaz._
 
@@ -14,9 +17,7 @@ import schela.Types._
 object Repl {
 
   val env: mutable.Map[String, LispVal] =
-    mutable.Map().addAll(
-      primitives.map { case (v, func) => (v, LPrimitiveFunc(func)) }
-    )
+    mutable.Map() ++= primitives.map { case (v, func) => (v, LPrimitiveFunc(func)) }
 
   def getVar(name: String, closure: Option[mutable.Map[String, LispVal]] = None): ThrowsError[LispVal] =
     if (closure.exists(_.isDefinedAt(name)))
@@ -50,28 +51,40 @@ object Repl {
 
   def bindVars(closure: mutable.Map[String, LispVal], vs: List[(String, LispVal)]): mutable.Map[String, LispVal] = {
     val newClosure = closure.clone()
-    newClosure.addAll(vs)
-    newClosure
+    newClosure ++= vs
   }
 
   def loadFile(fileName: List[Char]): ThrowsError[LispVal] = {
+    def fromFileOpt(file: String): Option[BufferedSource] = {
+      try {
+        val src = scala.io.Source.fromFile(file)
+        src.some
+      } catch {
+        case _: FileNotFoundException => none
+      }
+    }
+
     val fileStr = fileName.mkString
     val parser: Parsez[List[LispVal]] = endBy(parseExpr, spaces)
-    val src = scala.io.Source.fromFile(fileStr) // TODO: fix file not found
-    val input = src.toList
-    src.close()
-    val result = runParser(parser, input) match {
-      case -\/(err) =>
-        (Parser(err): LispError).raiseError[ThrowsError, LispVal]
-      case \/-(values) =>
-        values.map(eval(_)).sequence match {  // traverse messes up order of eval...
+    val srcOpt = fromFileOpt(fileStr)
+    val inputOpt = srcOpt.map(_.toList)
+    srcOpt.foreach(_.close())
+
+    inputOpt match {
+      case None => (FileNotFound(fileStr): LispError).raiseError[ThrowsError, LispVal]
+      case Some(input) =>
+        runParser(parser, input) match {
           case -\/(err) =>
-            err.raiseError[ThrowsError, LispVal]
-          case \/-(_) =>
-            LAtom(s"$fileStr loaded".toList).point[ThrowsError]
+            (Parser(err): LispError).raiseError[ThrowsError, LispVal]
+          case \/-(values) =>
+            values.map(eval(_)).sequence match {  // traverse messes up order of eval...
+              case -\/(err) =>
+                err.raiseError[ThrowsError, LispVal]
+              case \/-(_) =>
+                LAtom(s"$fileStr loaded".toList).point[ThrowsError]
+            }
         }
     }
-    result
   }
 
   def runRepl(): Unit = {

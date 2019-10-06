@@ -13,6 +13,7 @@ object LispError {
       case Parser(err) => s"Parse error at $err"
       case BadSpecialForm(msg, v) => s"$msg: ${v.shows}"
       case NotAFunction(msg, fName) => s"$msg: $fName"
+      case FileNotFound(fileName) => s"""File "$fileName" not found"""
       case UnboundVar(msg, vName) => s"$msg: $vName"
         // default??
     }
@@ -25,5 +26,6 @@ final case class Parser(err: String) extends LispError
 final case class BadSpecialForm(msg: String, v: LispVal) extends LispError
 final case class NotAFunction(msg: String, fName: String) extends LispError
 final case class UnboundVar(msg: String, vName: String) extends LispError
+final case class FileNotFound(fileName: String) extends LispError
 final case class Default(msg: String) extends LispError
 
