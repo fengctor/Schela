@@ -5,6 +5,6 @@ import java.io.File
 import schela.Repl._
 
 object Main extends App {
-  load("stdlib.scm".toList)
+  loadFile("stdlib.scm".toList)
   runRepl
 }

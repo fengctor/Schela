@@ -6,4 +6,5 @@ object SchemeKeywords {
   val `set!`: List[Char] = "set!".toList
   val define: List[Char] = "define".toList
   val lambda: List[Char] = "lambda".toList
+  val load: List[Char] = "load".toList
 }

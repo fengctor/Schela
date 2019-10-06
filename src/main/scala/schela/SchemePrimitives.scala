@@ -41,7 +41,7 @@ object SchemePrimitives {
 
   def numBinop(op: (Int, Int) => Int)(args: List[LispVal]): ThrowsError[LispVal] = args match {
     case arg1 :: arg2 :: rest =>
-      args.traverse(unwrapNum) >>= (as => LNumber(as.foldl1Opt(op.curried).get).point[ThrowsError])
+      args.map(unwrapNum).sequence >>= (as => LNumber(as.foldl1Opt(op.curried).get).point[ThrowsError])
 
     case _ => (NumArgs(2, args): LispError).raiseError[ThrowsError, LispVal]
   }

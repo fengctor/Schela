@@ -54,14 +54,22 @@ object Repl {
     newClosure
   }
 
-  def load(fileName: List[Char]): ThrowsError[LispVal] = {
+  def loadFile(fileName: List[Char]): ThrowsError[LispVal] = {
+    val fileStr = fileName.mkString
     val parser: Parsez[List[LispVal]] = endBy(parseExpr, spaces)
-    val src = scala.io.Source.fromFile(fileName.mkString)
+    val src = scala.io.Source.fromFile(fileStr) // TODO: fix file not found
     val input = src.toList
     src.close()
     val result = runParser(parser, input) match {
-      case -\/(err) => (Parser(err): LispError).raiseError[ThrowsError, LispVal]
-      case \/-(values) => values.map(eval(_)).sequence.map(LList)   // traverse messes up order of eval...
+      case -\/(err) =>
+        (Parser(err): LispError).raiseError[ThrowsError, LispVal]
+      case \/-(values) =>
+        values.map(eval(_)).sequence match {  // traverse messes up order of eval...
+          case -\/(err) =>
+            err.raiseError[ThrowsError, LispVal]
+          case \/-(_) =>
+            LAtom(s"$fileStr loaded".toList).point[ThrowsError]
+        }
     }
     result
   }

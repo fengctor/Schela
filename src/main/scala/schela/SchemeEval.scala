@@ -20,7 +20,7 @@ object SchemeEval {
         val (givenArgs, givenVarargs) = args.splitAt(params.size)
         val newClosure = bindVars(closure, params.zip(givenArgs))
         val newerClosure = varargs.map(argName => bindVars(newClosure, List((argName, LList(givenVarargs))))).getOrElse(newClosure)
-        body.traverse(eval(_, newerClosure.some)).map(_.last)
+        body.map(eval(_, newerClosure.some)).sequence.map(_.last)
       }
 
     case wrongType => (TypeMismatch("function", wrongType): LispError).raiseError[ThrowsError, LispVal]
@@ -64,6 +64,9 @@ object SchemeEval {
     case LList(List(LAtom(`define`), LAtom(name), form)) =>
       eval(form, closure) >>= (value => defineVar(name.mkString, value, closure))
 
+    case LList(List(LAtom(`load`), LString(fileName))) =>
+      loadFile(fileName)
+
     case LList(LAtom(`define`) :: LList(LAtom(name) :: params) :: body) =>
       defineVar(name.mkString, LFunc(params.map(_.shows), None, body, closure.getOrElse(mutable.Map())))
 
@@ -82,7 +85,7 @@ object SchemeEval {
     case LList(f :: args) =>
       for {
         func <- eval(f, closure)
-        argValues <- args.traverse(eval(_, closure))
+        argValues <- args.map(eval(_, closure)).sequence
         result <- apply(func, argValues)
       } yield result
 
