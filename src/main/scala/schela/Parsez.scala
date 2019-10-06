@@ -19,7 +19,15 @@ object Parsez {
   }
 
   def runParser[A](parser: Parsez[A], s: List[Char]): String \/ A = {
-    // TODO: make sure parens aren't mismatched before processing
+    def parensMatch(text: List[Char], round: Int = 0, square: Int = 0): Boolean = text match {
+      case '(' :: xs => parensMatch(xs, round + 1, square)
+      case '[' :: xs => parensMatch(xs, round, square + 1)
+      case ')' :: xs => if (round == 0) false else parensMatch(xs, round - 1, square)
+      case ']' :: xs => if (square == 0) false else parensMatch(xs, round, square - 1)
+      case _ :: xs => parensMatch(xs, round, square)
+      case Nil => round == 0 && square == 0
+    }
+
     def assimilateParens(text: List[Char]): List[Char] =
       text.map {
         case '[' => '('
@@ -27,10 +35,14 @@ object Parsez {
         case c => c
       }
 
-    parser.parse(assimilateParens(s)) match {
-      case List((res, Nil)) => res.right
-      case List((_, rs)) => s"stream left over: ${rs.mkString}".left
-      case x => s"parser error: $x".left
+    if (parensMatch(s)) {
+      parser.parse(assimilateParens(s)) match {
+        case List((res, Nil)) => res.right
+        case List((_, rs)) => s"stream left over: ${rs.mkString}".left
+        case x => s"parser error: $x".left
+      }
+    } else {
+      "mismatched parens".left
     }
   }
 
