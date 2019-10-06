@@ -10,7 +10,6 @@ import schela.Types._
 
 object SchemeEval {
 
-
   def apply(f: LispVal, args: List[LispVal]): ThrowsError[LispVal] = f match {
     case LPrimitiveFunc(func) => func(args)
 

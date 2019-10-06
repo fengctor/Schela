@@ -12,6 +12,7 @@ import schela.SchemePrimitives._
 import schela.Types._
 
 object Repl {
+
   val env: mutable.Map[String, LispVal] =
     mutable.Map().addAll(
       primitives.map { case (v, func) => (v, LPrimitiveFunc(func)) }
@@ -60,7 +61,7 @@ object Repl {
     src.close()
     val result = runParser(parser, input) match {
       case -\/(err) => (Parser(err): LispError).raiseError[ThrowsError, LispVal]
-      case \/-(values) => values.traverse(eval(_)).map(LList)
+      case \/-(values) => values.map(eval(_)).sequence.map(LList)   // traverse messes up order of eval...
     }
     result
   }

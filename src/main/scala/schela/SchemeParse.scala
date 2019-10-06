@@ -8,7 +8,6 @@ import schela.Parsez._
 import schela.Types._
 
 object SchemeParse {
-// Lisp stuff
 
   val parseAtom: Parsez[LispVal] = for {
     c  <- letter <|> symbol
