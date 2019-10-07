@@ -3,7 +3,6 @@ package schela
 import scala.collection.mutable
 import scalaz._
 import Scalaz._
-
 import schela.Repl._
 import schela.SchemeKeywords._
 import schela.Types._
@@ -75,11 +74,20 @@ object SchemeEval {
     case LList(List(LAtom(`set!`), LAtom(name), form)) =>
       eval(form, closure) >>= (value => setVar(name.mkString, value, closure))
 
-    case LList(List(LAtom(`define`), LAtom(name), form)) =>
-      eval(form, closure) >>= (value => defineVar(name.mkString, value, closure))
-
     case LList(List(LAtom(`load`), LString(fileName))) =>
       loadFile(fileName)
+
+    case LList(List(LAtom(`let`), LList(Nil), body)) =>
+      eval(body, closure)
+
+    case LList(List(LAtom(`let`), LList(LList(List(LAtom(name), form)) :: otherBindings), body)) =>
+      eval(form, closure) >>= { value =>
+        defineVar(name.mkString, value, closure)
+        eval(LList(List(LAtom(`let`), LList(otherBindings), body)), closure)
+      }
+
+    case LList(List(LAtom(`define`), LAtom(name), form)) =>
+      eval(form, closure) >>= (value => defineVar(name.mkString, value, closure))
 
     case LList(LAtom(`define`) :: LList(LAtom(name) :: params) :: body) =>
       defineVar(name.mkString, LFunc(params.map(_.shows), None, body, closure.getOrElse(mutable.Map())))

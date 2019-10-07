@@ -8,8 +8,13 @@ import Types._
 sealed abstract class Parsez[+A] {
   def parse(s: S): List[(A, S)]
 
-  // better looking syntax
-  def <|>[B >: A](other: => Parsez[B]): Parsez[B] = Parsez.parserInstance.plus(this, other)
+  // because I can't find a good typeclass like Haskell's Alternative in Scalaz
+  def <|>[B >: A](other: => Parsez[B]): Parsez[B] = Parsez { s =>
+    parse(s) match {
+      case Nil => other.parse(s)
+      case x => x
+    }
+  }
 }
 
 object Parsez {
@@ -51,23 +56,31 @@ object Parsez {
     case c :: cs => List((c, cs))
   }
 
-  implicit val parserInstance: Monad[Parsez] with Alternative[Parsez] =
-    new Monad[Parsez] with Alternative[Parsez] {
-      override def plus[A](a: Parsez[A], b: => Parsez[A]): Parsez[A] = Parsez { s =>
-        a.parse(s) match {
-          case Nil => b.parse(s)
-          case x => x
-        }
-      }
-
+  implicit val parserMonadInstance: Monad[Parsez] =
+    new Monad[Parsez] {
       override def bind[A, B](fa: Parsez[A])(f: A => Parsez[B]): Parsez[B] = Parsez { s =>
         fa.parse(s) >>= { case (a, s2) => f(a).parse(s2) }
       }
 
       override def point[A](a: => A): Parsez[A] = Parsez(s => List((a, s)))
-
-      override def empty[A]: Parsez[A] = Parsez(const(Nil))
     }
+
+  implicit def parserMonoidInstance[A](implicit monoid: Monoid[A]): Monoid[Parsez[A]] = new Monoid[Parsez[A]] {
+    override def zero: Parsez[A] = Parsez(const(Nil))
+
+    override def append(f1: Parsez[A], f2: => Parsez[A]): Parsez[A] = Parsez { s =>
+      f1.parse(s) match {
+        case Nil => f2.parse(s)
+        case f1Parsed @ List((f1Result, f1Remaining)) =>
+          f2.parse(f1Remaining) match {
+            case Nil => f1Parsed
+            case List((f2Result, f2Remaining)) =>
+              List((monoid.append(f1Result, f2Result), f2Remaining))
+          }
+
+      }
+    }
+  }
 
   def satisfy(p: Char => Boolean): Parsez[Char] = item >>= { c =>
     if (p(c)) c.point[Parsez] else Parsez(const(Nil))
