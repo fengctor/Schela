@@ -33,6 +33,7 @@ object SchemeEval {
     case \/-(v) => v
   }
 
+  // recursion in closures is messed up... no trail of static link
   def eval(v: LispVal, closure: Option[mutable.Map[String, LispVal]] = None): ThrowsError[LispVal] = v match {
     case LChar(_) =>
       v.point[ThrowsError]

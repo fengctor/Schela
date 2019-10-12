@@ -89,3 +89,18 @@
   (if (|| (null? xs) (null? ys))
     '()
     (cons (cons (car xs) (car ys)) (zip (cdr xs) (cdr ys)))))
+
+(define (splitAt i xs)
+  (define (splitHelp j l r)
+    (cond [(null? l) (cons (reverse r) l)]
+          [(<= j 0) (cons (reverse r) l)]
+          [else (splitHelp (- j 1) (cdr l) (cons (car l) r))]))
+  (splitHelp i xs '()))
+
+(define (splitBy pred xs)
+  (foldr 
+    (lambda (c r) (if (pred c) 
+                    (cons (cons c (car r)) (cdr r)) 
+                    (cons (car r) (cons c (cdr r)))))
+    (cons '() '())
+    xs))

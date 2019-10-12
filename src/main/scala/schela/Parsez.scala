@@ -24,13 +24,16 @@ object Parsez {
   }
 
   def runParser[A](parser: Parsez[A], s: List[Char]): String \/ A = {
-    def parensMatch(text: List[Char], round: Int = 0, square: Int = 0): Boolean = text match {
-      case '(' :: xs => parensMatch(xs, round + 1, square)
-      case '[' :: xs => parensMatch(xs, round, square + 1)
-      case ')' :: xs => if (round == 0) false else parensMatch(xs, round - 1, square)
-      case ']' :: xs => if (square == 0) false else parensMatch(xs, round, square - 1)
-      case _ :: xs => parensMatch(xs, round, square)
-      case Nil => round == 0 && square == 0
+    def parensMatch(text: List[Char], stack: List[Char]): Boolean = (text, stack) match {
+      case ('(' :: xs, _) => parensMatch(xs, '(' :: stack)
+      case ('[' :: xs, _) => parensMatch(xs, '[' :: stack)
+      case (')' :: xs, '(' :: ss) => parensMatch(xs, ss)
+      case (')' :: xs, _) => false
+      case (']' :: xs, '[' :: ss) => parensMatch(xs, ss)
+      case (']' :: xs, _) => false
+      case (_ :: xs, _) => parensMatch(xs, stack)
+      case (Nil, Nil) => true
+      case _ => false
     }
 
     def assimilateParens(text: List[Char]): List[Char] =
@@ -40,7 +43,7 @@ object Parsez {
         case c => c
       }
 
-    if (parensMatch(s)) {
+    if (parensMatch(s, Nil)) {
       parser.parse(assimilateParens(s)) match {
         case List((res, Nil)) => res.right
         case List((_, rs)) => s"stream left over: ${rs.mkString}".left
@@ -104,6 +107,8 @@ object Parsez {
   }
 
   val symbol: Parsez[Char] = oneOf("!#$%&|*+-/:<=>?@^_~".toList)
+
+  def optional[A](a: A, p: Parsez[A]): Parsez[A] = p <|> a.point[Parsez]
 
   def many[A](p: Parsez[A]): Parsez[List[A]] = many1(p) <|> List.empty.point[Parsez]
 

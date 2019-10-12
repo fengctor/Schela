@@ -37,11 +37,14 @@ object SchemeParse {
     } yield LString(x)
   }
 
-  val parseNumber: Parsez[LispVal] = (char('-').map(List(_)) |+| many1(digit)).map {
-    // will always have at least 1 digit in result since we're using many1 (I think)
-    case '-' :: ns => LNumber(-1 * ns.foldLeft(0) ((a, c) => 10 * a + (c - '0')))
-    case ns => LNumber(ns.foldLeft(0) ((a, c) => 10 * a + (c - '0')))
-  }
+  val parseNumber: Parsez[LispVal] =
+    for {
+      neg <- optional('0', char('-'))
+      digs <- many1(digit)
+    } yield {
+      val numValue = digs.foldLeft(0) ((a, c) => 10 * a + (c - '0'))
+      LNumber(if (neg == '-') -1 * numValue else numValue)
+    }
 
   // Needs to be lazy to avoid recursive definition problems
   lazy val parseList: Parsez[LispVal] = sepBy(parseExpr, spaces).map(LList)
