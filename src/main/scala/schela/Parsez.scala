@@ -23,7 +23,7 @@ object Parsez {
     def parse(s: S): List[(A, S)] = parseFn(s)
   }
 
-  def runParser[A](parser: Parsez[A], s: List[Char]): String \/ A = {
+  def runParser[A](parser: Parsez[A], s: List[Char]): Either[String, A] = {
     def parensMatch(text: List[Char], stack: List[Char]): Boolean = (text, stack) match {
       case ('(' :: xs, _) => parensMatch(xs, '(' :: stack)
       case ('[' :: xs, _) => parensMatch(xs, '[' :: stack)
@@ -45,12 +45,12 @@ object Parsez {
 
     if (parensMatch(s, Nil)) {
       parser.parse(assimilateParens(s)) match {
-        case List((res, Nil)) => res.right
-        case List((_, rs)) => s"stream left over: ${rs.mkString}".left
-        case x => s"parser error: $x".left
+        case List((res, Nil)) => Right(res)
+        case List((_, rs)) => Left(s"stream left over: ${rs.mkString}")
+        case x => Left(s"parser error: $x")
       }
     } else {
-      "mismatched parens".left
+      Left("mismatched parens")
     }
   }
 

@@ -14,9 +14,9 @@ object LispVal {
     override def shows(f: LispVal): String = f match {
       case LAtom(name) => name.mkString
 
-      case LList(vs) => s"'(${vs.map(shows).mkString(" ")})"
+      case LList(vs) => s"(${vs.map(shows).mkString(" ")})"
 
-      case LDottedList(vs, v) => s"'(${vs.map(shows).mkString(" ")} . ${shows(v)})"
+      case LDottedList(vs, v) => s"(${vs.map(shows).mkString(" ")} . ${shows(v)})"
 
       case LNumber(n) => n.toString
 

@@ -2,6 +2,7 @@ package schela
 
 import scalaz._
 import Scalaz._
+import schela.Types.ThrowsError
 
 sealed trait LispError
 

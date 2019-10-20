@@ -14,7 +14,7 @@ object SchemeEval {
 
     case LFunc(params, varargs, body, closure) =>
       if (params.size != args.size && varargs.isEmpty) {
-        (NumArgs(params.size, args): LispError).raiseError[ThrowsError, LispVal]
+        NumArgs(params.size, args).raiseError
       } else {
         val (givenArgs, givenVarargs) = args.splitAt(params.size)
         val newClosure = bindVars(closure, params.zip(givenArgs))
@@ -22,18 +22,17 @@ object SchemeEval {
         body.map(eval(_, newerClosure.some)).sequence.map(_.last)
       }
 
-    case wrongType => (TypeMismatch("function", wrongType): LispError).raiseError[ThrowsError, LispVal]
+    case wrongType => TypeMismatch("function", wrongType).raiseError
   }
 
   def trapError(action: ThrowsError[String]): ThrowsError[String] =
     action.handleError(_.shows.point[ThrowsError])
 
-  // action should never be a -\/
+  // action should never be a Left
   def extractValue[A](action: ThrowsError[A]): A = action match {
-    case \/-(v) => v
+    case Right(v) => v
   }
 
-  // recursion in closures is messed up... no trail of static link
   def eval(v: LispVal, closure: Option[mutable.Map[String, LispVal]] = None): ThrowsError[LispVal] = v match {
     case LChar(_) =>
       v.point[ThrowsError]
@@ -56,7 +55,7 @@ object SchemeEval {
       eval(pred, closure) >>= {
         case LBool(true) => eval(ifTrue, closure)
         case LBool(false) => eval(ifFalse, closure)
-        case _ => (TypeMismatch("bool", pred): LispError).raiseError[ThrowsError, LispVal]
+        case _ => TypeMismatch("bool", pred).raiseError
       }
 
     case LList(List(LAtom(`cond`))) =>
@@ -69,7 +68,7 @@ object SchemeEval {
       eval(pred, closure) >>= {
         case LBool(true) => eval(result, closure)
         case LBool(false) => eval(LList(LAtom(`cond`) :: rest), closure)
-        case _ => (TypeMismatch("bool", pred): LispError).raiseError[ThrowsError, LispVal]
+        case _ => TypeMismatch("bool", pred).raiseError
       }
 
     case LList(List(LAtom(`set!`), LAtom(name), form)) =>
@@ -112,6 +111,6 @@ object SchemeEval {
         result <- apply(func, argValues)
       } yield result
 
-    case badForm => (BadSpecialForm("Unrecognized special form", badForm): LispError).raiseError[ThrowsError, LispVal]
+    case badForm => BadSpecialForm("Unrecognized special form", badForm).raiseError
   }
 }

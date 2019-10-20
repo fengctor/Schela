@@ -83,8 +83,8 @@ object SchemeParse {
 
   def readExpr(s: List[Char]): ThrowsError[LispVal] = {
     runParser(parseExpr, s) match {
-      case -\/(err) => (Parser(err): LispError).raiseError[ThrowsError, LispVal]
-      case \/-(value) => value.point[ThrowsError]
+      case Left(err) => Parser(err).raiseError
+      case Right(value) => value.point[ThrowsError]
     }
   }
 }

@@ -25,8 +25,7 @@ object Repl {
     else if (env.isDefinedAt(name))
       env(name).point[ThrowsError]
     else
-      (UnboundVar("Getting an unbound variable", name): LispError)
-        .raiseError[ThrowsError, LispVal]
+      UnboundVar("Getting an unbound variable", name).raiseError
 
   def setVar(name: String, value: LispVal, closure: Option[mutable.Map[String, LispVal]] = None): ThrowsError[LispVal] =
     if (closure.exists(_.isDefinedAt(name))) {
@@ -36,8 +35,7 @@ object Repl {
       env(name) = value
       value.point[ThrowsError]
     } else {
-      (UnboundVar("Setting an unbound variable", name): LispError)
-        .raiseError[ThrowsError, LispVal]
+      UnboundVar("Setting an unbound variable", name).raiseError
     }
 
   def defineVar(
@@ -72,16 +70,16 @@ object Repl {
     srcOpt.foreach(_.close())
 
     inputOpt match {
-      case None => (FileNotFound(fileStr): LispError).raiseError[ThrowsError, LispVal]
+      case None => FileNotFound(fileStr).raiseError
       case Some(input) =>
         runParser(parser, input) match {
-          case -\/(err) =>
-            (Parser(err): LispError).raiseError[ThrowsError, LispVal]
-          case \/-(values) =>
+          case Left(err) =>
+            Parser(err).raiseError
+          case Right(values) =>
             values.map(eval(_)).sequence match {  // traverse messes up order of eval...
-              case -\/(err) =>
-                err.raiseError[ThrowsError, LispVal]
-              case \/-(_) =>
+              case Left(err) =>
+                err.raiseError
+              case Right(_) =>
                 LAtom(s"$fileStr loaded".toList).point[ThrowsError]
             }
         }

@@ -9,41 +9,41 @@ import schela.Types._
 object SchemePrimitives {
 
   private def isSymbol(v: List[LispVal]): ThrowsError[LispVal] = v match {
-    case List(LList(List(LAtom(`quote`), _))) => LBool(true).point[ThrowsError]
+    case List(LAtom(_)) => LBool(true).point[ThrowsError]
     case List(_) => LBool(false).point[ThrowsError]
-    case given => (NumArgs(1, given): LispError).raiseError[ThrowsError, LispVal]
+    case given => NumArgs(1, given).raiseError
   }
 
   private def isString(v: List[LispVal]): ThrowsError[LispVal] = v match {
     case List(LString(_)) => LBool(true).point[ThrowsError]
     case List(_) => LBool(false).point[ThrowsError]
-    case given => (NumArgs(1, given): LispError).raiseError[ThrowsError, LispVal]
+    case given => NumArgs(1, given).raiseError
   }
 
   private def isNumber(v: List[LispVal]): ThrowsError[LispVal] = v match {
     case List(LNumber(_)) => LBool(true).point[ThrowsError]
     case List(_) => LBool(false).point[ThrowsError]
-    case given => (NumArgs(1, given): LispError).raiseError[ThrowsError, LispVal]
+    case given => NumArgs(1, given).raiseError
   }
 
   def unwrapNum(v: LispVal): ThrowsError[Int] = v match {
     case LNumber(n) => n.point[ThrowsError]
-    case notNum => (TypeMismatch("number", notNum): LispError).raiseError[ThrowsError, Int]
+    case notNum => TypeMismatch("number", notNum).raiseError
   }
   def unwrapString(v: LispVal): ThrowsError[List[Char]] = v match {
     case LString(s) => s.point[ThrowsError]
-    case notString => (TypeMismatch("string", notString): LispError).raiseError[ThrowsError, List[Char]]
+    case notString => TypeMismatch("string", notString).raiseError
   }
   def unwrapBool(v: LispVal): ThrowsError[Boolean] = v match {
     case LBool(b) => b.point[ThrowsError]
-    case notBool => (TypeMismatch("bool", notBool): LispError).raiseError[ThrowsError, Boolean]
+    case notBool => TypeMismatch("bool", notBool).raiseError
   }
 
   def numBinop(op: (Int, Int) => Int)(args: List[LispVal]): ThrowsError[LispVal] = args match {
     case arg1 :: arg2 :: rest =>
       args.map(unwrapNum).sequence >>= (as => LNumber(as.foldl1Opt(op.curried).get).point[ThrowsError])
 
-    case _ => (NumArgs(2, args): LispError).raiseError[ThrowsError, LispVal]
+    case _ => NumArgs(2, args).raiseError
   }
 
   def boolBinop[A](
@@ -59,22 +59,22 @@ object SchemePrimitives {
   private def car(list: List[LispVal]): ThrowsError[LispVal] = list match {
     case List(LList(x :: _)) => x.point[ThrowsError]
     case List(LDottedList(x :: _, _)) => x.point[ThrowsError]
-    case List(invalid) => (TypeMismatch("pair", invalid): LispError).raiseError[ThrowsError, LispVal]
-    case tooManyArgs => (NumArgs(1, tooManyArgs): LispError).raiseError[ThrowsError, LispVal]
+    case List(invalid) => TypeMismatch("pair", invalid).raiseError
+    case tooManyArgs => NumArgs(1, tooManyArgs).raiseError
   }
 
   private def cdr(list: List[LispVal]): ThrowsError[LispVal] = list match {
     case List(LList(_ :: xs)) => LList(xs).point[ThrowsError]
     case List(LDottedList(List(_), x)) => x.point[ThrowsError]
     case List(LDottedList(_ :: xs, x)) => LDottedList(xs, x).point[ThrowsError]
-    case List(invalid) => (TypeMismatch("pair", invalid): LispError).raiseError[ThrowsError, LispVal]
-    case tooManyArgs => (NumArgs(1, tooManyArgs): LispError).raiseError[ThrowsError, LispVal]
+    case List(invalid) => TypeMismatch("pair", invalid).raiseError
+    case tooManyArgs => NumArgs(1, tooManyArgs).raiseError
   }
 
   private def cons(args: List[LispVal]): ThrowsError[LispVal] = args match {
     case List(x, LList(xs)) => LList(x :: xs).point[ThrowsError]
     case List(x, y) => LDottedList(List(x), y).point[ThrowsError]
-    case argsMismatch => (NumArgs(2, argsMismatch): LispError).raiseError[ThrowsError, LispVal]
+    case argsMismatch => NumArgs(2, argsMismatch).raiseError
   }
 
   private def eqv(args: List[LispVal]): ThrowsError[LispVal] = args match {
@@ -97,9 +97,9 @@ object SchemePrimitives {
       LBool(true).point[ThrowsError]
 
     case List(LList(x :: xs), LList(y :: ys)) => eqv(List(x, y)) match {
-      case -\/(_) => LBool(false).point[ThrowsError]
-      case \/-(LBool(true)) => eqv(List(LList(xs), LList(ys)))
-      case \/-(LBool(false)) => LBool(false).point[ThrowsError]
+      case Left(_) => LBool(false).point[ThrowsError]
+      case Right(LBool(true)) => eqv(List(LList(xs), LList(ys)))
+      case Right(LBool(false)) => LBool(false).point[ThrowsError]
     }
 
     case List(LDottedList(xs, x), LDottedList(ys, y)) =>
@@ -109,7 +109,7 @@ object SchemePrimitives {
       LBool(false).point[ThrowsError]
 
     case wrongNumArgs =>
-      (NumArgs(2, wrongNumArgs): LispError).raiseError[ThrowsError, LispVal]
+      NumArgs(2, wrongNumArgs).raiseError
   }
 
   val primitives: Map[String, List[LispVal] => ThrowsError[LispVal]] = Map(
