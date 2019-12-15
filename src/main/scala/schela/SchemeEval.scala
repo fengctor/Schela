@@ -17,7 +17,7 @@ object SchemeEval {
         NumArgs(params.size, args).raiseError
       } else {
         val (givenArgs, givenVarargs) = args.splitAt(params.size)
-        val envWithArgs: List[(String, LispVal)] = optName match {
+        val envWithArgs: Env = optName match {
           case None => bindVars (env, params.zip (givenArgs) )
           case Some(name) => bindVars (env, (name -> fun) :: params.zip (givenArgs) )
         }
@@ -25,7 +25,7 @@ object SchemeEval {
           .map(argName => bindVars(envWithArgs, List((argName, LList(givenVarargs)))))
           .getOrElse(envWithArgs)
 
-        val base: ThrowsError[(LispVal, List[(String, LispVal)])] = (LUnit(), envWithVarargs).point[ThrowsError]
+        val base: ThrowsError[(LispVal, Env)] = (LUnit(), envWithVarargs).point[ThrowsError]
         body.foldLeft(base) { (acc, cur) =>
           acc >>= {
             case (_, newEnv) => eval(cur, newEnv)
@@ -44,7 +44,7 @@ object SchemeEval {
     case Right(v) => v
   }
 
-  def eval(v: LispVal, env: List[(String, LispVal)]): ThrowsError[(LispVal, List[(String,LispVal)])] = v match {
+  def eval(v: LispVal, env: Env): ThrowsError[(LispVal, List[(String,LispVal)])] = v match {
     case LChar(_) =>
       (v, env).point[ThrowsError]
 
@@ -82,10 +82,6 @@ object SchemeEval {
         case (LBool(false), resEnv) => eval(LList(LAtom(`cond`) :: rest), resEnv)
         case _ => TypeMismatch("bool", pred).raiseError
       }
-
-    /* byebye impure
-    case LList(List(LAtom(`set!`), LAtom(name), form)) =>
-      eval(form, closure) >>= (value => setVar(name.mkString, value, closure))*/
 
     case LList(List(LAtom(`load`), LString(fileName))) =>
       loadFile(fileName, env)

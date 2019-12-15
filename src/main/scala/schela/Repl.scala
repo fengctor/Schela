@@ -15,34 +15,22 @@ import schela.Types._
 
 object Repl {
 
-  val prims: List[(String, LispVal)] =
+  val prims: Env =
     primitives.map { case (v, func) => (v, LPrimitiveFunc(func)) }
 
-  def getVar(name: String, env: List[(String, LispVal)]): ThrowsError[LispVal] =
+  def getVar(name: String, env: Env): ThrowsError[LispVal] =
     env.find(_._1 === name) match {
       case Some((_, value)) => value.point[ThrowsError]
       case _ => UnboundVar("Getting an unbound variable", name).raiseError
     }
 
-  /* byebye impure
-  def setVar(name: String, value: LispVal, closure: Option[mutable.Map[String, LispVal]] = None): ThrowsError[LispVal] =
-    if (closure.exists(_.isDefinedAt(name))) {
-      closure.get(name) = value
-      value.point[ThrowsError]
-    } else if (env.isDefinedAt(name)) {
-      env(name) = value
-      value.point[ThrowsError]
-    } else {
-      UnboundVar("Setting an unbound variable", name).raiseError
-    }*/
-
-  def defineVar(name: String, value: LispVal, env: List[(String, LispVal)]): List[(String, LispVal)] = {
+  def defineVar(name: String, value: LispVal, env: Env): Env = {
     (name -> value) :: env
   }
 
-  def bindVars(env: List[(String, LispVal)], vs: List[(String, LispVal)]): List[(String, LispVal)] = vs ++ env
+  def bindVars(env: Env, vs: Env): Env = vs ++ env
 
-  def loadFile(fileName: List[Char], env: List[(String, LispVal)]): ThrowsError[(LispVal, List[(String, LispVal)])] = {
+  def loadFile(fileName: List[Char], env: Env): ThrowsError[(LispVal, Env)] = {
     def fromFileOpt(file: String): Option[BufferedSource] = {
       try {
         val src = scala.io.Source.fromFile(file)
@@ -82,7 +70,7 @@ object Repl {
     }
   }
 
-  def runRepl(env: List[(String, LispVal)]): Unit = {
+  def runRepl(env: Env): Unit = {
     print("Schela>>> ")
     val in: List[Char] = scala.io.StdIn.readLine().toList
     if (in != "quit".toList) {
