@@ -112,7 +112,7 @@ object SchemePrimitives {
       NumArgs(2, wrongNumArgs).raiseError
   }
 
-  val primitives: Map[String, List[LispVal] => ThrowsError[LispVal]] = Map(
+  val primitives: List[(String, List[LispVal] => ThrowsError[LispVal])] = List(
     // arithmetic ops
     "+" -> numBinop(_ + _),
     "-" -> numBinop(_ - _),

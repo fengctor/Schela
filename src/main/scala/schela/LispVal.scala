@@ -31,8 +31,8 @@ object LispVal {
 
       case LPrimitiveFunc(_) => "<primitive>"
 
-      case LFunc(args, varargs, body, _) =>
-        s"(lambda (${args.mkString(" ")}${varargs.map(" . " + _).getOrElse("")}) ...)"
+      case LFunc(name, args, varargs, body, _) =>
+        s"$name := (lambda (${args.mkString(" ")}${varargs.map(" . " + _).getOrElse("")}) ...)"
 
       case LUnit() => ""
     }
@@ -52,9 +52,10 @@ final case class LList(vs: List[LispVal]) extends LispVal
 final case class LDottedList(vs: List[LispVal], v: LispVal) extends LispVal
 final case class LPrimitiveFunc(f: List[LispVal] => ThrowsError[LispVal]) extends LispVal
 final case class LFunc(
+  name: Option[String],
   params: List[String],
   vararg: Option[String],
   body: List[LispVal],
-  closure: mutable.Map[String, LispVal]
+  env: List[(String, LispVal)]
 ) extends LispVal
 final case class LUnit() extends LispVal
