@@ -51,8 +51,8 @@ object SchelaPrimitives {
   }
 
   def boolBinop[A](
-                    unwrapper: SVal => ThrowsError[A],
-                    op: (A, A) => Boolean
+    unwrapper: SVal => ThrowsError[A],
+    op: (A, A) => Boolean
   )(args: List[SVal]): ThrowsError[SVal] = args match {
     case List(arg1, arg2) => for {
       l <- unwrapper(arg1)
