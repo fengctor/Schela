@@ -7,4 +7,7 @@ scalaVersion := "2.13.1"
 libraryDependencies += "org.scalaz" %% "scalaz-core" % "7.2.29"
 
 addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
+
 enablePlugins(PackPlugin)
+packMain := Map("schela" -> "schela.Main")
+packJvmOpts := Map("schela" -> Seq("-Xss1G", "-Xms4G", "-Xmx4G"))
