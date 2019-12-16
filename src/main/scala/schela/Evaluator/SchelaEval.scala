@@ -80,6 +80,7 @@ object SchelaEval {
         }
     }
   }
+
   def loadFile(fileName: List[Char], env: Env): ThrowsError[(SVal, Env)] = {
     def fromFileOpt(file: String): Option[BufferedSource] = {
       try {
@@ -137,6 +138,22 @@ object SchelaEval {
     case Right(v) => v
   }
 
+  def evalCond(clauses: List[SVal], env: Env): ThrowsError[(SVal, Env)] = clauses match {
+    case Nil =>
+      (SUnit(), env).point[ThrowsError] // TODO: cond error
+
+    case SList(List(SAtom(`else`), result)) :: _ =>
+      eval(result, env)
+
+    case SList(List(pred, result)) :: restClauses =>
+      eval(pred, env) >>= {
+        case (SBool(true), resEnv) => eval(result, resEnv)
+        case (SBool(false), resEnv) => evalCond(restClauses, resEnv)
+        case _ => TypeMismatch("bool", pred).raiseError
+      }
+    case badForm :: _ => BadSpecialForm("Invalid cond clause", badForm).raiseError
+  }
+
   // expr must already be evaluated
   def evalMatch(expr: SVal, clauses: List[SVal], env: Env): ThrowsError[(SVal, Env)] = clauses match {
     case Nil => MatchFailure("No match found", expr).raiseError
@@ -173,21 +190,8 @@ object SchelaEval {
         case (_, resEnv) => TypeMismatch("bool", pred).raiseError
       }
 
-    case SList(List(SAtom(`cond`))) =>
-      (SUnit(), env).point[ThrowsError]
-
-    case SList(SAtom(`cond`) :: SList(List(SAtom(`else`), result)) :: _) =>
-      eval(result, env)
-
-    case SList(SAtom(`cond`) ::
-      SList(List(pred, result)) ::
-      rest
-    ) =>
-      eval(pred, env) >>= {
-        case (SBool(true), resEnv) => eval(result, resEnv)
-        case (SBool(false), resEnv) => eval(SList(SAtom(`cond`) :: rest), resEnv)
-        case _ => TypeMismatch("bool", pred).raiseError
-      }
+    case SList(SAtom(`cond`) :: clauses) =>
+      evalCond(clauses, env)
 
     case SList(SAtom(`match`) :: expr :: clauses) =>
       eval(expr, env) >>= { case (evalExpr, newEnv) => evalMatch(evalExpr, clauses, newEnv) }
