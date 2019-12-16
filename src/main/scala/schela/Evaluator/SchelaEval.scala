@@ -56,6 +56,30 @@ object SchelaEval {
     case _ => none
   }
 
+  def fileParseAttempt(
+    fileStr: String,
+    parser: Parsez[List[SVal]],
+    input: List[Char],
+    env: Env
+  ): ThrowsError[(SVal, Env)] = {
+    runParser(parser, input) match {
+      case Left(err) =>
+        Parser(err).raiseError
+      case Right(Nil) =>
+        (SAtom(s"$fileStr loaded, but nothing happened".toList), env).point[ThrowsError]
+      case Right(v :: vs) =>
+        vs.foldLeft(eval(v, env)) { (acc, cur) =>
+          acc >>= {
+            case (_, resEnv) => eval(cur, resEnv)
+          }
+        } match {
+          case Left(err) =>
+            err.raiseError
+          case Right((_, resEnv)) =>
+            (SAtom(s"$fileStr loaded".toList), resEnv).point[ThrowsError]
+        }
+    }
+  }
   def loadFile(fileName: List[Char], env: Env): ThrowsError[(SVal, Env)] = {
     def fromFileOpt(file: String): Option[BufferedSource] = {
       try {
@@ -75,24 +99,7 @@ object SchelaEval {
 
     inputOpt match {
       case None => FileNotFound(fileStr).raiseError
-      case Some(input) =>
-        runParser(parser, input) match {
-          case Left(err) =>
-            Parser(err).raiseError
-          case Right(Nil) =>
-            (SAtom(s"$fileStr loaded, but nothing happened".toList), env).point[ThrowsError]
-          case Right(v :: vs) =>
-            vs.foldLeft(eval(v, env)) { (acc, cur) =>
-              acc >>= {
-                case (_, resEnv) => eval(cur, resEnv)
-              }
-            } match {
-              case Left(err) =>
-                err.raiseError
-              case Right((_, resEnv)) =>
-                (SAtom(s"$fileStr loaded".toList), resEnv).point[ThrowsError]
-            }
-        }
+      case Some(input) => fileParseAttempt(fileStr, parser, input, env)
     }
   }
 
