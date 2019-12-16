@@ -13,8 +13,9 @@ object SError {
       case Parser(err) => s"Parse error at $err"
       case BadSpecialForm(msg, v) => s"$msg: ${v.shows}"
       case NotAFunction(msg, fName) => s"$msg: $fName"
-      case FileNotFound(fileName) => s"""File "$fileName" not found"""
       case UnboundVar(msg, vName) => s"$msg: $vName"
+      case MatchFailure(msg, expr) => s"$msg: ${expr.shows}"
+      case FileNotFound(fileName) => s"""File "$fileName" not found"""
         // default??
     }
   }
@@ -26,6 +27,7 @@ final case class Parser(err: String) extends SError
 final case class BadSpecialForm(msg: String, v: SVal) extends SError
 final case class NotAFunction(msg: String, fName: String) extends SError
 final case class UnboundVar(msg: String, vName: String) extends SError
+final case class MatchFailure(msg: String, expr: SVal) extends SError
 final case class FileNotFound(fileName: String) extends SError
 final case class Default(msg: String) extends SError
 

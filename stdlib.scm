@@ -4,7 +4,6 @@
 
 (define (list . xs) xs)
 
-
 (define (id x) x)
 
 (define (flip f) (lambda (x y) (f y x)))
@@ -29,17 +28,17 @@
 
 (define (lcm a b) (/ (* a b) (gcd a b)))
 
-(define (foldr f base xs)
-  (if (null? xs)
-    base
-    (f (car xs) (foldr f base (cdr xs)))))
+(define (foldr f base lst)
+  (match lst
+    (() base)
+    ((cons x xs) (f x (foldr f base xs)))))
 
 (define reduce foldr)
 
-(define (foldl f base xs)
-  (if (null? xs)
-    base
-    (foldl f (f base (car xs)) (cdr xs))))
+(define (foldl f base lst)
+  (match lst
+    (() base)
+    ((cons x xs) (foldl f (f base x) xs))))
 
 (define fold foldl)
 

@@ -2,7 +2,8 @@ package schela
 
 import java.io.FileNotFoundException
 
-import scalaz.Scalaz._
+import scalaz._
+import Scalaz._
 
 import Parsez._
 import SchelaParse._
@@ -13,6 +14,8 @@ import Types.{Env, ThrowsError}
 import scala.io.BufferedSource
 
 object SchelaEval {
+
+  implicit def CharEqual: Equal[Char] = _ == _ // Not sure where this is in Scalaz 🤔
 
   val prims: Env =
     primitives.map { case (v, func) => (v, SPrimitiveFunc(func)) }
@@ -28,6 +31,31 @@ object SchelaEval {
   }
 
   def bindVars(env: Env, vs: Env): Env = vs ++ env
+
+  // TODO: other than list
+  def matchAttempt(pattern: SVal, expr: SVal, env: Env): Option[Env] = (pattern, expr) match {
+    case (SAtom(List('_')), _) => env.some
+    case (SAtom(v), _) => ((v.mkString -> expr) :: env).some
+
+    // list patterns
+    case (SList(Nil), SList(Nil)) => env.some
+    case (SList(List(SAtom(`consPat`), headPat, tailPat)), SList(x :: xs)) =>
+      matchAttempt(headPat, x, env) >>= { headEnv =>
+        matchAttempt(tailPat, SList(xs), headEnv)
+      }
+    case (SList(SAtom(`listPat`) :: patList), SList(exprList)) if patList.size === exprList.size =>
+      patList.zip(exprList).foldl(env.some) { accEnv =>
+        { case (curPat, curExpr) => accEnv >>= (matchAttempt(curPat, curExpr, _)) }
+      }
+
+    // literal patterns
+    case (SNumber(patN), SNumber(exprN)) if patN === exprN => env.some
+    case (SChar(patC), SChar(exprC))     if patC === exprC => env.some
+    case (SString(patS), SString(exprS)) if patS === exprS => env.some
+    case (SBool(patB), SBool(exprB))     if patB === exprB => env.some
+
+    case _ => none
+  }
 
   def loadFile(fileName: List[Char], env: Env): ThrowsError[(SVal, Env)] = {
     def fromFileOpt(file: String): Option[BufferedSource] = {
@@ -135,11 +163,29 @@ object SchelaEval {
     case SList(SAtom(`cond`) :: SList(List(SAtom(`else`), result)) :: _) =>
       eval(result, env)
 
-    case SList(SAtom(`cond`) :: SList(List(pred, result)) :: rest) =>
+    case SList(SAtom(`cond`) ::
+      SList(List(pred, result)) ::
+      rest
+    ) =>
       eval(pred, env) >>= {
         case (SBool(true), resEnv) => eval(result, resEnv)
         case (SBool(false), resEnv) => eval(SList(SAtom(`cond`) :: rest), resEnv)
         case _ => TypeMismatch("bool", pred).raiseError
+      }
+
+    case SList(List(SAtom(`match`), expr)) => MatchFailure("No match found", expr).raiseError
+    case SList(SAtom(`match`) :: expr ::
+      SList(List(pattern, result)) ::
+      rest
+    ) =>
+      eval(expr, env) >>= { case (evalExpr, newEnv) =>
+        matchAttempt(pattern, evalExpr, newEnv) match {
+          case None => eval(
+            SList(SAtom(`match`) :: expr :: rest), // TODO: abstract match out into its own function to avoid repeated evaluations of expr
+            newEnv
+          )
+          case Some(matchEnv) => eval(result, matchEnv)
+        }
       }
 
     case SList(List(SAtom(`load`), SString(fileName))) =>

@@ -1,9 +1,9 @@
 package schela
 
 import scalaz.Scalaz.{char => _, _}
-import scalaz._
-import schela.Types._
+
 import Parsez._
+import Types._
 
 import scala.Function.const
 
