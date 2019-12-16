@@ -10,4 +10,4 @@ addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
 
 enablePlugins(PackPlugin)
 packMain := Map("schela" -> "schela.Main")
-packJvmOpts := Map("schela" -> Seq("-Xss1G", "-Xms4G", "-Xmx4G"))
+packJvmOpts := Map("schela" -> Seq("-Xss512M", "-Xms2G", "-Xmx4G"))
