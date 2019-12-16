@@ -103,3 +103,23 @@
                     (cons (car r) (cons c (cdr r)))))
     (cons '() '())
     xs))
+
+(define (take n lst)
+  (match lst
+    [() '()]
+    [(cons x xs) (if (<= n 0) '() (cons x (take (- n 1) xs)))]))
+
+(define (drop n lst)
+  (match lst
+    [() '()]
+    [(cons x xs) (if (<= n 0) (cons x xs) (drop (- n 1) xs))]))
+
+(define (takeWhile pred lst)
+  (match lst
+    [() '()]
+    [(cons x xs) (if (pred x) (cons x (takeWhile pred xs)) '())]))
+
+(define (dropWhile pred lst)
+  (match lst
+    [() '()]
+    [(cons x xs) (if (pred x) (dropWhile pred xs) (cons x xs))]))

@@ -32,7 +32,6 @@ object SchelaEval {
 
   def bindVars(env: Env, vs: Env): Env = vs ++ env
 
-  // TODO: other than list
   def matchAttempt(pattern: SVal, expr: SVal, env: Env): Option[Env] = (pattern, expr) match {
     case (SAtom(List('_')), _) => env.some
     case (SAtom(v), _) => ((v.mkString -> expr) :: env).some
@@ -131,7 +130,17 @@ object SchelaEval {
     case Right(v) => v
   }
 
-  def eval(v: SVal, env: Env): ThrowsError[(SVal, List[(String,SVal)])] = v match {
+  // expr must already be evaluated
+  def evalMatch(expr: SVal, clauses: List[SVal], env: Env): ThrowsError[(SVal, Env)] = clauses match {
+    case Nil => MatchFailure("No match found", expr).raiseError
+    case SList(List(pattern, result)) :: rest => matchAttempt(pattern, expr, env) match {
+      case None => evalMatch(expr, rest, env)
+      case Some(matchEnv) => eval(result, matchEnv)
+    }
+    case badForm :: _ => BadSpecialForm("Invalid match clause", badForm).raiseError
+  }
+
+  def eval(v: SVal, env: Env): ThrowsError[(SVal, Env)] = v match {
     case SChar(_) =>
       (v, env).point[ThrowsError]
 
@@ -173,20 +182,8 @@ object SchelaEval {
         case _ => TypeMismatch("bool", pred).raiseError
       }
 
-    case SList(List(SAtom(`match`), expr)) => MatchFailure("No match found", expr).raiseError
-    case SList(SAtom(`match`) :: expr ::
-      SList(List(pattern, result)) ::
-      rest
-    ) =>
-      eval(expr, env) >>= { case (evalExpr, newEnv) =>
-        matchAttempt(pattern, evalExpr, newEnv) match {
-          case None => eval(
-            SList(SAtom(`match`) :: expr :: rest), // TODO: abstract match out into its own function to avoid repeated evaluations of expr
-            newEnv
-          )
-          case Some(matchEnv) => eval(result, matchEnv)
-        }
-      }
+    case SList(SAtom(`match`) :: expr :: clauses) =>
+      eval(expr, env) >>= { case (evalExpr, newEnv) => evalMatch(evalExpr, clauses, newEnv) }
 
     case SList(List(SAtom(`load`), SString(fileName))) =>
       loadFile(fileName, env)
