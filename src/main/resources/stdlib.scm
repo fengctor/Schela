@@ -1,4 +1,4 @@
-(define (not x) (if x #t #f))
+(define (not x) (if x #f #t))
 
 (define (null? l) (eqv? l '()))
 
