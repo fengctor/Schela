@@ -1,6 +1,5 @@
 package schela
 
-import java.io.File
 import scala.io.Source.fromInputStream
 
 import scalaz._
@@ -18,16 +17,17 @@ object Main extends Repl {
     val loadResult = loadStdlib(prims)
     println(extractValue(trapError(loadResult.map(_._1.shows))))
 
-    loadResult
-      .fold(
-        { _ => runRepl(prims) },
-        { case (_, env) => runRepl(env)}
-      )
+    loadResult match {
+      case Left(_) => runRepl(prims)
+      case Right((_, env)) => runRepl(env)
+    }
   }
 
   def loadStdlib(env: Env): ThrowsError[(SVal, Env)] = {
     val parser: Parsez[List[SVal]] = endBy(parseExpr, spaces)
-    val input: List[Char] = fromInputStream(getClass.getResourceAsStream("/stdlib.scm")).toList
+    val input: List[Char] = fromInputStream(
+      getClass.getResourceAsStream("/stdlib.scm")
+    ).toList
     fileParseAttempt("stdlib", parser, input, env)
   }
 }

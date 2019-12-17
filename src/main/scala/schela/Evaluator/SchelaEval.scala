@@ -15,7 +15,7 @@ import scala.io.BufferedSource
 
 object SchelaEval {
 
-  implicit def CharEqual: Equal[Char] = _ == _ // Not sure where this is in Scalaz 🤔
+  implicit val CharEqual: Equal[Char] = _ == _ // Not sure where this is in Scalaz 🤔
 
   val prims: Env =
     primitives.map { case (v, func) => (v, SPrimitiveFunc(func)) }
