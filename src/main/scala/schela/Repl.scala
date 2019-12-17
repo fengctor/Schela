@@ -11,7 +11,7 @@ import scala.annotation.tailrec
 trait Repl {
   @tailrec
   final def runRepl(env: Env): Unit = {
-    print("Schela>>> ")
+    print("Schela> ")
     val in: List[Char] = scala.io.StdIn.readLine().toList
     if (in != "quit".toList) {
       val evalResult = readExpr(in) >>= (expr => eval(expr, env))
