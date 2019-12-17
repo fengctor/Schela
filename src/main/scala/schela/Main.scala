@@ -14,11 +14,10 @@ import Types._
 
 object Main extends Repl {
   def main(args: Array[String]): Unit = {
-    val loadResult = loadStdlib(prims)
-    println(extractValue(trapError(loadResult.map(_._1.shows))))
+    println("Welcome to Schela: a Scheme-like language written in Scala by Gary Feng.")
 
-    loadResult match {
-      case Left(_) => runRepl(prims)
+    // will not fail
+    loadStdlib(prims) match {
       case Right((_, env)) => runRepl(env)
     }
   }

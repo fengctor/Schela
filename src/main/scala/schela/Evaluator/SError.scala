@@ -6,10 +6,10 @@ import Scalaz._
 sealed trait SError
 
 object SError {
-  implicit val lispErrorShow: Show[SError] = new Show[SError] {
+  implicit val SErrorShow: Show[SError] = new Show[SError] {
     override def shows(f: SError): String = f match {
       case NumArgs(expected, found) => s"Expected $expected args; found values ${found.map(_.shows).mkString(" ")}"
-      case TypeMismatch(expected, found) => s"Invalid type: expected $expected, found $found"
+      case TypeMismatch(expected, found) => s"Invalid type: expected $expected, found ${found.shows}"
       case Parser(err) => s"Parse error at $err"
       case BadSpecialForm(msg, v) => s"$msg: ${v.shows}"
       case NotAFunction(msg, fName) => s"$msg: $fName"
