@@ -14,7 +14,7 @@ import Types._
 
 object Main extends Repl {
   def main(args: Array[String]): Unit = {
-    println("Welcome to Schela: a Scheme-like language written in Scala by Gary Feng.")
+    println("Welcome to Schela: a Scheme-like language written in Scala by Gary F.")
 
     // will not fail
     loadStdlib(prims) match {
