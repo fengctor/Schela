@@ -6,6 +6,8 @@
 
 (define (id x) x)
 
+(define (const x y) x)
+
 (define (flip f) (lambda (x y) (f y x)))
 
 (define (curry f x) (lambda (y) (f x y)))
