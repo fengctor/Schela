@@ -35,6 +35,8 @@ object SVal {
       case SUnit() => ""
     }
   }
+
+  implicit val SValEqual: Equal[SVal] = Equal.equalA[SVal]
 }
 
 final case class SAtom(name: S) extends SVal

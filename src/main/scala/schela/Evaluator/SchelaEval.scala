@@ -31,6 +31,16 @@ object SchelaEval {
 
   def bindVars(env: Env, vs: Env): Env = vs ++ env
 
+  private def literalMatchAttempt(patExpr: SVal, expr: SVal, env: Env): Option[Env] = (patExpr, expr) match {
+    case (SAtom(patA), SAtom(exprA))     if patA === exprA => env.some
+    case (SNumber(patN), SNumber(exprN)) if patN === exprN => env.some
+    case (SChar(patC), SChar(exprC))     if patC === exprC => env.some
+    case (SString(patS), SString(exprS)) if patS === exprS => env.some
+    case (SBool(patB), SBool(exprB))     if patB === exprB => env.some
+    case (SList(patL), SList(exprL))     if patL === exprL => env.some
+    case _ => none
+  }
+
   def matchAttempt(pattern: SVal, expr: SVal, env: Env): Option[Env] = (pattern, expr) match {
     case (SAtom(List('_')), _) => env.some
     case (SAtom(v), _) => ((v.mkString -> expr) :: env).some
@@ -45,14 +55,11 @@ object SchelaEval {
       patList.zip(exprList).foldl(env.some) { accEnv =>
         { case (curPat, curExpr) => accEnv >>= (matchAttempt(curPat, curExpr, _)) }
       }
+    case (quoted@SList(SAtom(`quote`) :: _), _) => // TODO: match quote pattern
+      eval(quoted, env).toOption >>= { case (evalPat, evalEnv) => literalMatchAttempt(evalPat, expr, evalEnv) }
 
     // literal patterns
-    case (SNumber(patN), SNumber(exprN)) if patN === exprN => env.some
-    case (SChar(patC), SChar(exprC))     if patC === exprC => env.some
-    case (SString(patS), SString(exprS)) if patS === exprS => env.some
-    case (SBool(patB), SBool(exprB))     if patB === exprB => env.some
-
-    case _ => none
+    case (_, _) => literalMatchAttempt(pattern, expr, env)
   }
 
   def fileParseAttempt(
