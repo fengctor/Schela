@@ -23,7 +23,7 @@ object Main extends Repl {
   }
 
   def loadStdlib(env: Env): ThrowsError[(SVal, Env)] = {
-    val parser: Parsez[List[SVal]] = endBy(parseExpr, spaces)
+    val parser: Parsez[List[SVal]] = spaces *> endBy(parseExpr, spaces1)
     val input: List[Char] = fromInputStream(
       getClass.getResourceAsStream("/stdlib.scm")
     ).toList

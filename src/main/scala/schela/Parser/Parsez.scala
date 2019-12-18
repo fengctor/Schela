@@ -25,33 +25,10 @@ object Parsez {
   }
 
   def runParser[A](parser: Parsez[A], s: S): Either[String, A] = {
-    def parensMatch(text: S, stack: List[Char]): Boolean = (text, stack) match {
-      case ('(' +: xs, _) => parensMatch(xs, '(' :: stack)
-      case ('[' +: xs, _) => parensMatch(xs, '[' :: stack)
-      case (')' +: xs, '(' :: ss) => parensMatch(xs, ss)
-      case (')' +: xs, _) => false
-      case (']' +: xs, '[' :: ss) => parensMatch(xs, ss)
-      case (']' +: xs, _) => false
-      case (_ +: xs, _) => parensMatch(xs, stack)
-      case (Nil, Nil) => true
-      case _ => false
-    }
-
-    def assimilateParens(text: S): S =
-      text.map {
-        case '[' => '('
-        case ']' => ')'
-        case c => c
-      }
-
-    if (parensMatch(s, Nil)) {
-      parser.parse(assimilateParens(s)) match {
-        case List((res, Nil)) => Right(res)
-        case List((_, rs)) => Left(s"stream left over: ${rs.mkString}")
-        case x => Left(s"parser error: $x")
-      }
-    } else {
-      Left("mismatched parens")
+    parser.parse(s) match {
+      case List((res, Nil)) => Right(res)
+      case List((_, rs)) => Left(s"stream left over: ${rs.mkString}")
+      case x => Left(s"$x")
     }
   }
 
@@ -137,7 +114,9 @@ object Parsez {
 
   def space: Parsez[Char] = oneOf(List(' ', '\t', '\n', '\r', '\f'))
 
-  def spaces: Parsez[Unit] = skipMany1(space)
+  def spaces: Parsez[Unit] = skipMany(space)
+
+  def spaces1: Parsez[Unit] = skipMany1(space)
 
   val escape: Parsez[Char] = char('\\') >>= { _ =>
     Parsez {

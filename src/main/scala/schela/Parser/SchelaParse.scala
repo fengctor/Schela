@@ -47,18 +47,20 @@ object SchelaParse {
     }
 
   // Needs to be lazy to avoid recursive definition problems
-  lazy val parseList: Parsez[SVal] = sepBy(parseExpr, spaces).map(SList)
+  lazy val parseList: Parsez[SVal] = sepBy(parseExpr, spaces1).map(SList)
 
   // Needs to be lazy to avoid recursive definition problems
-  lazy val parseDottedList: Parsez[SVal] = for {
-    vs <- endBy(parseExpr, spaces)
-    v <- char('.') *> spaces *> parseExpr
-  } yield SDottedList(vs, v)
+  lazy val parseDottedList: Parsez[SVal] =
+    for {
+      vs <- endBy(parseExpr, spaces1)
+      v <- char('.') *> spaces1 *> parseExpr
+    } yield SDottedList(vs, v)
 
-  val parseQuoted: Parsez[SVal] = for {
-    _ <- char('\'')
-    x <- parseExpr
-  } yield SList(List(SAtom("quote".toList), x))
+  val parseQuoted: Parsez[SVal] =
+    for {
+      _ <- char('\'')
+      x <- parseExpr
+    } yield SList(List(SAtom("quote".toList), x))
 
   val parseExpr: Parsez[SVal] = {
     val parseParenList: Parsez[SVal] = for {
@@ -81,10 +83,49 @@ object SchelaParse {
       (parseParenList <|> parseParenDottedList)
   }
 
-  def readExpr(s: List[Char]): ThrowsError[SVal] = {
-    runParser(parseExpr, s) match {
-      case Left(err) => Parser(err).raiseError
-      case Right(value) => value.point[ThrowsError]
+  /** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** **
+   Functions for preprocessing text before running it through the parser
+   ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** **/
+
+  // TODO: is this what Lenses are for?
+  private def toNextQuote(text: S): (S, S) = text match {
+    case Nil => (Nil, Nil)
+    case '\\' +: escaped +: cs =>
+      val (acc, rest) = toNextQuote(cs)
+      ('\\' +: escaped +: acc, rest)
+    case '"' :: cs => (Nil, cs)
+    case c :: cs =>
+      val (acc, rest) = toNextQuote(cs)
+      (c +: acc, rest)
+  }
+
+  def deleteComments(text: S): S = text match {
+    case Nil => Nil
+    case '"' +: cs =>
+      val (fromQuote, afterQuote) = toNextQuote(cs)
+      ('"' +: fromQuote) ++ ('"' +: deleteComments(afterQuote))
+    case ';' +: cs => cs.dropWhile(!Set('\n', '\r').contains(_)) match {
+      case Nil => Nil
+      case rest => deleteComments(rest)
     }
+    case c +: cs => c +: deleteComments(cs)
+  }
+
+  def parensMatch(text: S, stack: List[Char]): Boolean = (text, stack) match {
+    case ('(' +: xs, _) => parensMatch(xs, '(' :: stack)
+    case ('[' +: xs, _) => parensMatch(xs, '[' :: stack)
+    case (')' +: xs, '(' :: ss) => parensMatch(xs, ss)
+    case (')' +: xs, _) => false
+    case (']' +: xs, '[' :: ss) => parensMatch(xs, ss)
+    case (']' +: xs, _) => false
+    case (_ +: xs, _) => parensMatch(xs, stack)
+    case (Nil, Nil) => true
+    case _ => false
+  }
+
+  def assimilateParens(text: S): S = text.map {
+    case '[' => '('
+    case ']' => ')'
+    case c => c
   }
 }

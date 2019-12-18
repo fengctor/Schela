@@ -2,6 +2,8 @@ package schela
 
 import scalaz._
 import Scalaz._
+
+import Parsez.{ spaces, runParser }
 import SchelaEval._
 import SchelaParse._
 import Types._
@@ -9,6 +11,25 @@ import Types._
 import scala.annotation.tailrec
 
 trait Repl {
+  def readExpr(s: List[Char]): ThrowsError[SVal] = {
+    val parser = for {
+      _    <- spaces
+      expr <- parseExpr
+      _    <- spaces
+    } yield expr
+
+    val commentsRemoved = deleteComments(s)
+
+    if (parensMatch(commentsRemoved, Nil)) {
+      runParser(parser, commentsRemoved) match {
+        case Left(err) => Parser(err).raiseError
+        case Right(value) => value.point[ThrowsError]
+      }
+    } else {
+      Parser("mismatched parens").raiseError
+    }
+  }
+
   @tailrec
   final def runRepl(env: Env): Unit = {
     print("Schela> ")

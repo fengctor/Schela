@@ -61,22 +61,26 @@ object SchelaEval {
     input: S,
     env: Env
   ): ThrowsError[(SVal, Env)] = {
-    runParser(parser, input) match {
-      case Left(err) =>
-        Parser(err).raiseError
-      case Right(Nil) =>
-        (SAtom(s"$fileStr loaded, but nothing happened".toList), env).point[ThrowsError]
-      case Right(v :: vs) =>
-        vs.foldLeft(eval(v, env)) { (acc, cur) =>
-          acc >>= {
-            case (_, resEnv) => eval(cur, resEnv)
+    val commentsRemoved = deleteComments(input)
+
+    if (parensMatch(commentsRemoved, Nil)) {
+      runParser(parser, assimilateParens(commentsRemoved)) match {
+        case Left(err) =>
+          Parser(err).raiseError
+        case Right(Nil) =>
+          (SAtom(s"$fileStr loaded, but nothing happened".toList), env).point[ThrowsError]
+        case Right(v :: vs) =>
+          vs.foldLeft(eval(v, env)) { (acc, cur) =>
+            acc >>= { case (_, resEnv) => eval(cur, resEnv) }
+          } match {
+            case Left(err) =>
+              err.raiseError
+            case Right((_, resEnv)) =>
+              (SAtom(s"$fileStr loaded".toList), resEnv).point[ThrowsError]
           }
-        } match {
-          case Left(err) =>
-            err.raiseError
-          case Right((_, resEnv)) =>
-            (SAtom(s"$fileStr loaded".toList), resEnv).point[ThrowsError]
-        }
+      }
+    } else {
+      Parser("mismatched parens").raiseError
     }
   }
 
@@ -91,7 +95,7 @@ object SchelaEval {
     }
 
     val fileStr = fileName.mkString
-    val parser: Parsez[List[SVal]] = endBy(parseExpr, spaces)
+    val parser: Parsez[List[SVal]] = spaces *> endBy(parseExpr, spaces1)
     val srcOpt = fromFileOpt(fileStr)
     val inputOpt = srcOpt.map(_.toSeq)
 
