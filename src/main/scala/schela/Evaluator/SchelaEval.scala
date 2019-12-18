@@ -80,7 +80,7 @@ object SchelaEval {
     }
   }
 
-  def loadFile(fileName: Seq[Char], env: Env): ThrowsError[(SVal, Env)] = {
+  def loadFile(fileName: S, env: Env): ThrowsError[(SVal, Env)] = {
     def fromFileOpt(file: String): Option[BufferedSource] = {
       try {
         val src = scala.io.Source.fromFile(file)
