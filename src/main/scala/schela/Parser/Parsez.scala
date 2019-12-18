@@ -24,20 +24,20 @@ object Parsez {
     def parse(s: S): List[(A, S)] = parseFn(s)
   }
 
-  def runParser[A](parser: Parsez[A], s: List[Char]): Either[String, A] = {
-    def parensMatch(text: List[Char], stack: List[Char]): Boolean = (text, stack) match {
-      case ('(' :: xs, _) => parensMatch(xs, '(' :: stack)
-      case ('[' :: xs, _) => parensMatch(xs, '[' :: stack)
-      case (')' :: xs, '(' :: ss) => parensMatch(xs, ss)
-      case (')' :: xs, _) => false
-      case (']' :: xs, '[' :: ss) => parensMatch(xs, ss)
-      case (']' :: xs, _) => false
-      case (_ :: xs, _) => parensMatch(xs, stack)
+  def runParser[A](parser: Parsez[A], s: S): Either[String, A] = {
+    def parensMatch(text: S, stack: List[Char]): Boolean = (text, stack) match {
+      case ('(' +: xs, _) => parensMatch(xs, '(' :: stack)
+      case ('[' +: xs, _) => parensMatch(xs, '[' :: stack)
+      case (')' +: xs, '(' :: ss) => parensMatch(xs, ss)
+      case (')' +: xs, _) => false
+      case (']' +: xs, '[' :: ss) => parensMatch(xs, ss)
+      case (']' +: xs, _) => false
+      case (_ +: xs, _) => parensMatch(xs, stack)
       case (Nil, Nil) => true
       case _ => false
     }
 
-    def assimilateParens(text: List[Char]): List[Char] =
+    def assimilateParens(text: S): S =
       text.map {
         case '[' => '('
         case ']' => ')'
@@ -95,16 +95,16 @@ object Parsez {
   val letter: Parsez[Char] = satisfy(c => ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z'))
   val digit: Parsez[Char] = satisfy(c => '0' <= c && c <= '9')
 
-  def oneOf(cs: List[Char]): Parsez[Char] = satisfy(cs.contains(_))
+  def oneOf(cs: S): Parsez[Char] = satisfy(cs.contains(_))
 
-  def noneOf(cs: List[Char]): Parsez[Char] = satisfy(!cs.contains(_))
+  def noneOf(cs: S): Parsez[Char] = satisfy(!cs.contains(_))
 
-  def seq(s: List[Char]): Parsez[List[Char]] = s match {
-    case Nil => List.empty.point[Parsez]
-    case c :: cs => for {
+  def seq(s: S): Parsez[S] = s match {
+    case Nil => Seq.empty.point[Parsez]
+    case c +: cs => for {
       x <- char(c)
       xs <- seq(cs)
-    } yield x :: xs
+    } yield x +: xs
   }
 
   val symbol: Parsez[Char] = oneOf("!#$%&|*+-/:<=>?@^_~".toList)
@@ -141,12 +141,12 @@ object Parsez {
 
   val escape: Parsez[Char] = char('\\') >>= { _ =>
     Parsez {
-      case '"' :: cs => List(('"', cs))
-      case 't' :: cs => List(('\t', cs))
-      case 'n' :: cs => List(('\n', cs))
-      case 'r' :: cs => List(('\r', cs))
-      case 'f' :: cs => List(('\f', cs))
-      case '\\' :: cs => List(('\\', cs))
+      case '"' +: cs  => List(('"', cs))
+      case 't' +: cs  => List(('\t', cs))
+      case 'n' +: cs  => List(('\n', cs))
+      case 'r' +: cs  => List(('\r', cs))
+      case 'f' +: cs  => List(('\f', cs))
+      case '\\' +: cs => List(('\\', cs))
       case _ => Nil
     }
   }

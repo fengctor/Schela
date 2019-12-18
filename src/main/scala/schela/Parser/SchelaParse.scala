@@ -34,7 +34,7 @@ object SchelaParse {
       _ <- char('"')
       x <- many(escape <|> satisfy(_ != '"'))
       _ <- char('"')
-    } yield SString(x)
+    } yield SString(x.toSeq)
   }
 
   val parseNumber: Parsez[SVal] =

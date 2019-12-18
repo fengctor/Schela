@@ -4,12 +4,11 @@ import java.io.FileNotFoundException
 
 import scalaz._
 import Scalaz._
-
 import Parsez._
 import SchelaParse._
 import SchelaPrimitives._
 import SchelaKeywords._
-import Types.{Env, ThrowsError}
+import Types._
 
 import scala.io.BufferedSource
 
@@ -59,7 +58,7 @@ object SchelaEval {
   def fileParseAttempt(
     fileStr: String,
     parser: Parsez[List[SVal]],
-    input: List[Char],
+    input: S,
     env: Env
   ): ThrowsError[(SVal, Env)] = {
     runParser(parser, input) match {
@@ -81,7 +80,7 @@ object SchelaEval {
     }
   }
 
-  def loadFile(fileName: List[Char], env: Env): ThrowsError[(SVal, Env)] = {
+  def loadFile(fileName: Seq[Char], env: Env): ThrowsError[(SVal, Env)] = {
     def fromFileOpt(file: String): Option[BufferedSource] = {
       try {
         val src = scala.io.Source.fromFile(file)
@@ -94,7 +93,7 @@ object SchelaEval {
     val fileStr = fileName.mkString
     val parser: Parsez[List[SVal]] = endBy(parseExpr, spaces)
     val srcOpt = fromFileOpt(fileStr)
-    val inputOpt = srcOpt.map(_.toList)
+    val inputOpt = srcOpt.map(_.toSeq)
 
     srcOpt.foreach(_.close())
 

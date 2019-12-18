@@ -7,7 +7,7 @@ import Types._
 sealed trait SVal
 
 object SVal {
-  implicit val lispValShow: Show[SVal] = new Show[SVal] {
+  implicit val SValShow: Show[SVal] = new Show[SVal] {
     override def shows(f: SVal): String = f match {
       case SAtom(name) => name.mkString
 
@@ -40,7 +40,7 @@ object SVal {
 final case class SAtom(name: S) extends SVal
 final case class SNumber(n: Int) extends SVal
 final case class SChar(c: Char) extends SVal
-final case class SString(s: S) extends SVal
+final case class SString(s: Seq[Char]) extends SVal
 final case class SBool(b: Boolean) extends SVal
 final case class SList(vs: List[SVal]) extends SVal
 final case class SDottedList(vs: List[SVal], v: SVal) extends SVal

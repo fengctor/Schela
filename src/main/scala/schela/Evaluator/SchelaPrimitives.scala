@@ -1,6 +1,7 @@
 package schela
 
 import scalaz.Scalaz._
+import scalaz.{Foldable, IList, Monoid, NonEmptyList}
 import Types._
 
 object SchelaPrimitives {
@@ -34,7 +35,7 @@ object SchelaPrimitives {
     case SNumber(n) => n.point[ThrowsError]
     case notNum => TypeMismatch("number", notNum).raiseError
   }
-  def unwrapString(v: SVal): ThrowsError[List[Char]] = v match {
+  def unwrapString(v: SVal): ThrowsError[S] = v match {
     case SString(s) => s.point[ThrowsError]
     case notString => TypeMismatch("string", notString).raiseError
   }
@@ -79,6 +80,18 @@ object SchelaPrimitives {
     case List(x, SList(xs)) => SList(x :: xs).point[ThrowsError]
     case List(x, y) => SDottedList(List(x), y).point[ThrowsError]
     case argsMismatch => NumArgs(2, argsMismatch).raiseError
+  }
+
+  private def strAppend(args: List[SVal]): ThrowsError[SVal] = args match {
+    case str1 :: str2 :: rest =>
+      IList.fromList(args)  // compiler thinks I want to use Iterable.fold if using a normal list...
+        .traverse {
+          case SString(s) => s.point[ThrowsError]
+          case invalid => TypeMismatch("string", invalid).raiseError
+        }
+        .map(strs => SString(strs.fold))
+
+    case _ => NumArgs(2, args).raiseError
   }
 
   private def eqv(args: List[SVal]): ThrowsError[SVal] = args match {
@@ -139,17 +152,19 @@ object SchelaPrimitives {
     ">=" -> boolBinop[Int](unwrapNum, _ >= _),
     "&&" -> boolBinop[Boolean](unwrapBool, _ && _),
     "||" -> boolBinop[Boolean](unwrapBool, _ || _),
-    "string=?"  -> boolBinop[List[Char]](unwrapString, _ == _),
-    "string<?"  -> boolBinop[List[Char]](unwrapString, _ < _),
-    "string>?"  -> boolBinop[List[Char]](unwrapString, _ > _),
-    "string<=?" -> boolBinop[List[Char]](unwrapString, _ <= _),
-    "string>=?" -> boolBinop[List[Char]](unwrapString, _ >= _),
+    "string=?"  -> boolBinop[S](unwrapString, _ == _),
+    "string<?"  -> boolBinop[S](unwrapString, _.mkString < _.mkString),
+    "string>?"  -> boolBinop[S](unwrapString, _.mkString > _.mkString),
+    "string<=?" -> boolBinop[S](unwrapString, _.mkString <= _.mkString),
+    "string>=?" -> boolBinop[S](unwrapString, _.mkString >= _.mkString),
     "eq?"       -> eqv,
     "eqv?"      -> eqv,
     //"equal?" -> ???, // unsure how to implement
     // list primitives
     "car"  -> car,
     "cdr"  -> cdr,
-    "cons" -> cons
+    "cons" -> cons,
+    // string primitives
+    "str-append" -> strAppend
   )
 }
