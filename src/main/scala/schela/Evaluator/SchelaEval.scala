@@ -20,16 +20,24 @@ object SchelaEval {
     primitives.map { case (v, func) => (v, SPrimitiveFunc(func)) }
 
   def getVar(name: String, env: Env): ThrowsError[SVal] =
-    env.find(_._1 === name) match {
-      case Some((_, value)) => value.point[ThrowsError]
-      case _ => UnboundVar("Getting an unbound variable", name).raiseError
+    env.get(name) match {
+      case None        => UnboundVar("Getting an unbound variable", name).raiseError
+      case Some(value) => value.point[ThrowsError]
     }
 
-  def defineVar(name: String, value: SVal, env: Env): Env = {
-    (name -> value) :: env
+  def defineVar(name: String, value: SVal, env: Env): ThrowsError[Env] = {
+    env.get(name) match {
+      case Some(f@SFunc(_, _, _, _, _)) => BadSpecialForm(s"$name is already a defined function", f).raiseError // TODO: new error type, only do this for functions
+      case _                            => (env + (name -> value)).point[ThrowsError]
+    }
   }
 
-  def bindVars(env: Env, vs: Env): Env = vs ++ env
+  // TODO: check duplicates
+  def bindVars(vs: List[(String, SVal)], env: Env): ThrowsError[Env] =
+    vs.foldLeft(env.point[ThrowsError]) { (envResult, c) =>
+      val (name, value) = c
+      envResult >>= (e => defineVar(name, value, e))
+    }
 
   private def literalMatchAttempt(patExpr: SVal, expr: SVal, env: Env): Option[Env] = (patExpr, expr) match {
     case (SAtom(patA), SAtom(exprA))     if patA === exprA => env.some
@@ -41,21 +49,19 @@ object SchelaEval {
     case _ => none
   }
 
-  def matchAttempt(pattern: SVal, expr: SVal, env: Env): Option[Env] = (pattern, expr) match {
+  private def matchAttempt(pattern: SVal, expr: SVal, env: Env): Option[Env] = (pattern, expr) match {
     case (SAtom(List('_')), _) => env.some
-    case (SAtom(v), _) => ((v.mkString -> expr) :: env).some
+    case (SAtom(v), _) => defineVar(v.mkString, expr, env).toOption
 
     // list patterns
     case (SList(Nil), SList(Nil)) => env.some
     case (SList(List(SAtom(`consPat`), headPat, tailPat)), SList(x :: xs)) =>
-      matchAttempt(headPat, x, env) >>= { headEnv =>
-        matchAttempt(tailPat, SList(xs), headEnv)
-      }
+      matchAttempt(headPat, x, env) >>= (matchAttempt(tailPat, SList(xs), _))
     case (SList(SAtom(`listPat`) :: patList), SList(exprList)) if patList.size === exprList.size =>
       patList.zip(exprList).foldl(env.some) { accEnv =>
         { case (curPat, curExpr) => accEnv >>= (matchAttempt(curPat, curExpr, _)) }
       }
-    case (quoted@SList(SAtom(`quote`) :: _), _) => // TODO: match quote pattern
+    case (quoted@SList(SAtom(`quote`) :: _), _) =>
       eval(quoted, env).toOption >>= { case (evalPat, evalEnv) => literalMatchAttempt(evalPat, expr, evalEnv) }
 
     // literal patterns
@@ -122,14 +128,16 @@ object SchelaEval {
         NumArgs(params.size, args).raiseError
       } else {
         val (givenArgs, givenVarargs) = args.splitAt(params.size)
-        val envWithArgs: Env = optName.fold(identity[Env] _) { name =>
-          argEnv => bindVars(argEnv, List(name -> fun))
-        } (bindVars(env, params.zip (givenArgs)))
-        val envWithVarargs = varargs
-          .map(argName => bindVars(envWithArgs, List((argName, SList(givenVarargs)))))
+        val envWithArgs: ThrowsError[Env] = optName.fold(identity[ThrowsError[Env]] _) { name =>
+          argEnv => argEnv >>= (defineVar(name, fun, _))
+        } (bindVars(params.zip(givenArgs), env))
+        val envWithVarargs: ThrowsError[Env] = varargs
+          .map { argName =>
+            envWithArgs >>= (bindVars(List((argName, SList(givenVarargs))), _))
+          }
           .getOrElse(envWithArgs)
 
-        val base: ThrowsError[(SVal, Env)] = (SUnit(), envWithVarargs).point[ThrowsError]
+        val base: ThrowsError[(SVal, Env)] = envWithVarargs.map((SUnit(), _))
         body.foldLeft(base) { (acc, cur) =>
           acc >>= {
             case (_, newEnv) => eval(cur, newEnv)
@@ -214,30 +222,26 @@ object SchelaEval {
 
     case SList(List(SAtom(`let`), SList(SList(List(SAtom(name), form)) :: otherBindings), body)) =>
       eval(form, env) >>= {
-        case (value, newEnv) => eval(
-          SList(List(SAtom(`let`), SList(otherBindings), body)),
-          defineVar(name.mkString, value, newEnv)
-        )
+        case (value, newEnv) => defineVar(name.mkString, value, newEnv) >>= {
+          eval(SList(List(SAtom(`let`), SList(otherBindings), body)), _)
+        }
       }
 
     case SList(List(SAtom(`define`), SAtom(name), form)) =>
-      eval(form, env).map {
-        case (value, newEnv) => (SUnit(), defineVar(name.mkString, value, newEnv))
-      }
+      for {
+        (value, newEnv) <- eval(form, env)
+        defEnv          <- defineVar(name.mkString, value, newEnv)
+      } yield (SUnit(), defEnv)
 
     case SList(SAtom(`define`) :: SList(SAtom(name) :: params) :: body) =>
       val fName = name.mkString
-      (
-        SUnit(),
-        defineVar(fName, SFunc(fName.some, params.map(_.shows), None, body, env), env)
-      ).point[ThrowsError]
+      defineVar(fName, SFunc(fName.some, params.map(_.shows), None, body, env), env)
+        .map((SUnit(), _))
 
     case SList(SAtom(`define`) :: SDottedList(SAtom(name) :: params, varargs) :: body) =>
       val fName = name.mkString
-      (
-        SUnit(),
-        defineVar(fName, SFunc(fName.some, params.map(_.shows), Some(varargs.shows), body, env), env)
-      ).point[ThrowsError]
+      defineVar(fName, SFunc(fName.some, params.map(_.shows), Some(varargs.shows), body, env), env)
+        .map((SUnit(), _))
 
     case SList(SAtom(`lambda`) :: SList(params) :: body) =>
       (SFunc(none, params.map(_.shows), None, body, env), env).point[ThrowsError]

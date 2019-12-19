@@ -12,6 +12,8 @@
 
 (define (compose f g) (lambda (x) (f (g x))))
 
+(define (list . xs) xs)
+
 ;; predicates
 
 (define (null? l) (eqv? l '()))
@@ -162,8 +164,6 @@
 (define (sort lst) (sort-by <= lst))
 
 ;; convenient vararg functions
-
-(define (list . xs) xs)
 
 (define (sum . ns) (foldl + 0 ns))
 

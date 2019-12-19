@@ -129,7 +129,7 @@ object SchelaPrimitives {
       NumArgs(2, wrongNumArgs).raiseError
   }
 
-  val primitives: List[(String, List[SVal] => ThrowsError[SVal])] = List(
+  val primitives: Map[String, List[SVal] => ThrowsError[SVal]] = Map(
     // arithmetic ops
     "+"         -> numBinop(_ + _),
     "-"         -> numBinop(_ - _),
