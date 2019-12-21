@@ -25,14 +25,11 @@ object SchelaEval {
       case Some(value) => value.point[ThrowsError]
     }
 
+  // in case I ever want to fail defining a variable
   def defineVar(name: String, value: SVal, env: Env): ThrowsError[Env] = {
-    env.get(name) match {
-      case Some(f@SFunc(_, _, _, _, _)) => BadSpecialForm(s"$name is already a defined function", f).raiseError // TODO: new error type, only do this for functions
-      case _                            => (env + (name -> value)).point[ThrowsError]
-    }
+    (env + (name -> value)).point[ThrowsError]
   }
 
-  // TODO: check duplicates
   def bindVars(vs: List[(String, SVal)], env: Env): ThrowsError[Env] =
     vs.foldLeft(env.point[ThrowsError]) { (envResult, c) =>
       val (name, value) = c
