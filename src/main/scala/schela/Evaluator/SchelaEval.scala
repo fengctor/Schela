@@ -16,18 +16,20 @@ object SchelaEval {
 
   implicit val CharEqual: Equal[Char] = _ == _ // Not sure where this is in Scalaz 🤔
 
-  val prims: Env =
-    primitives.map { case (v, func) => (v, SPrimitiveFunc(func)) }
+  val prims: Env = Env(
+    primitives.map { case (v, func) => (v, SPrimitiveFunc(func)) },
+    Map.empty
+  )
 
   def getVar(name: String, env: Env): ThrowsError[SVal] =
-    env.get(name) match {
+    env.getBinding(name) match {
       case None        => UnboundVar("Getting an unbound variable", name).raiseError
       case Some(value) => value.point[ThrowsError]
     }
 
   // in case I ever want to fail defining a variable
   def defineVar(name: String, value: SVal, env: Env): ThrowsError[Env] = {
-    (env + (name -> value)).point[ThrowsError]
+    env.withBinding(name, value).point[ThrowsError]
   }
 
   def bindVars(vs: List[(String, SVal)], env: Env): ThrowsError[Env] =
@@ -73,8 +75,8 @@ object SchelaEval {
   ): ThrowsError[(SVal, Env)] = {
     val commentsRemoved = deleteComments(input)
 
-    if (parensMatch(commentsRemoved, Nil)) {
-      runParser(parser, assimilateParens(commentsRemoved)) match {
+    if (parensMatch(commentsRemoved)) {
+      runParser(parser, roundifyParens(commentsRemoved)) match {
         case Left(err) =>
           Parser(err).raiseError
         case Right(Nil) =>
@@ -179,6 +181,35 @@ object SchelaEval {
     case badForm :: _ => BadSpecialForm("Invalid match clause", badForm).raiseError
   }
 
+  def validateParams(params: List[SVal]): ThrowsError[List[SVal]] =
+    params.traverse {
+      case atom@SAtom(_) => atom.point[ThrowsError]
+      case badParam => BadSpecialForm("Invalid param", badParam).raiseError
+    }
+
+  def attemptStructConstruction(s: SVal, args: List[SVal], env: Env): ThrowsError[SVal] = s match {
+    case SAtom(name) =>
+      val nameStr = name.mkString
+      env.getStruct(nameStr) match {
+        case None => BadSpecialForm("Not a struct", s).raiseError
+        case Some(numParams) =>
+          if (numParams === args.size) {
+            SStruct(nameStr, args).point[ThrowsError]
+          } else {
+            NumArgs(numParams, args).raiseError
+          }
+      }
+
+    case _ => BadSpecialForm("Not a struct", s).raiseError
+  }
+
+  def attemptFunctionApplication(f: SVal, args: List[SVal], env: Env): ThrowsError[(SVal, Env)] =
+    for {
+      (func, newEnv) <- eval(f, env)
+      argValues <- args.map(eval(_, newEnv).map(_._1)).sequence
+      result <- apply(func, argValues)
+    } yield (result, env)
+
   def eval(v: SVal, env: Env): ThrowsError[(SVal, Env)] = v match {
     case SChar(_) =>
       (v, env).point[ThrowsError]
@@ -240,6 +271,11 @@ object SchelaEval {
       defineVar(fName, SFunc(fName.some, params.map(_.shows), Some(varargs.shows), body, env), env)
         .map((SUnit(), _))
 
+    case SList(List(SAtom(`struct`), SAtom(name), SList(givenParams))) =>
+      validateParams(givenParams).map { params =>
+        (SUnit(), env.withStruct(name.mkString, params.size))
+      }
+
     case SList(SAtom(`lambda`) :: SList(params) :: body) =>
       (SFunc(none, params.map(_.shows), None, body, env), env).point[ThrowsError]
 
@@ -250,11 +286,7 @@ object SchelaEval {
       (SFunc(none, List.empty, Some((varargs: SVal).shows), body, env), env).point[ThrowsError]
 
     case SList(f :: args) =>
-      for {
-        (func, newEnv) <- eval(f, env)
-        argValues <- args.map(eval(_, newEnv).map(_._1)).sequence
-        result <- apply(func, argValues)
-      } yield (result, env)
+      attemptStructConstruction(f, args, env).map((_, env)) |+| attemptFunctionApplication(f, args, env)
 
     case badForm => BadSpecialForm("Unrecognized special form", badForm).raiseError
   }

@@ -34,7 +34,7 @@ object Parsez {
 
   val item: Parsez[Char] = Parsez {
     case Nil => Nil
-    case c :: cs => List((c, cs))
+    case c +: cs => List((c, cs))
   }
 
   implicit val parserMonadInstance: Monad[Parsez] =

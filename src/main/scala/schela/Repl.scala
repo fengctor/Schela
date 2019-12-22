@@ -20,7 +20,7 @@ trait Repl {
 
     val commentsRemoved = deleteComments(s)
 
-    if (parensMatch(commentsRemoved, Nil)) {
+    if (parensMatch(commentsRemoved)) {
       runParser(parser, commentsRemoved) match {
         case Left(err) => Parser(err).raiseError
         case Right(value) => value.point[ThrowsError]

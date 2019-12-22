@@ -1,15 +1,16 @@
 package schela
 
 import scalaz.Scalaz.{char => _, _}
-
 import Parsez._
 import Types._
 
 import scala.Function.const
+import scala.annotation.tailrec
+import scala.collection.immutable.Queue
 
 object SchelaParse {
 
-  val parseAtom: Parsez[SVal] = for {
+  lazy val parseAtom: Parsez[SVal] = for {
     c  <- letter <|> symbol
     cs <- many(letter <|> digit <|> symbol)
   } yield c :: cs match {
@@ -18,7 +19,7 @@ object SchelaParse {
     case x => SAtom(x)
   }
 
-  val parseChar: Parsez[SVal] = {
+  lazy val parseChar: Parsez[SVal] = {
     val specialChar: Parsez[SVal] = seq("space".toList).map(const(SChar(' '))) <|> seq("newline".toList).map(const(SChar('\n')))
 
     val nested = for {
@@ -29,7 +30,7 @@ object SchelaParse {
     nested.join
   }
 
-  val parseString: Parsez[SVal] = {
+  lazy val parseString: Parsez[SVal] = {
     for {
       _ <- char('"')
       x <- many(escape <|> satisfy(_ != '"'))
@@ -37,7 +38,7 @@ object SchelaParse {
     } yield SString(x.toSeq)
   }
 
-  val parseNumber: Parsez[SVal] =
+  lazy val parseNumber: Parsez[SVal] =
     for {
       neg <- optional('0', char('-'))
       digs <- many1(digit)
@@ -46,30 +47,28 @@ object SchelaParse {
       SNumber(if (neg == '-') -1 * numValue else numValue)
     }
 
-  // Needs to be lazy to avoid recursive definition problems
   lazy val parseList: Parsez[SVal] = sepBy(parseExpr, spaces1).map(SList)
 
-  // Needs to be lazy to avoid recursive definition problems
   lazy val parseDottedList: Parsez[SVal] =
     for {
       vs <- endBy(parseExpr, spaces1)
       v <- char('.') *> spaces1 *> parseExpr
     } yield SDottedList(vs, v)
 
-  val parseQuoted: Parsez[SVal] =
+  lazy val parseQuoted: Parsez[SVal] =
     for {
       _ <- char('\'')
       x <- parseExpr
     } yield SList(List(SAtom("quote".toList), x))
 
   val parseExpr: Parsez[SVal] = {
-    val parseParenList: Parsez[SVal] = for {
+    lazy val parseParenList: Parsez[SVal] = for {
       _ <- char('(')
       x <- parseList
       _ <- char(')')
     } yield x
 
-    val parseParenDottedList: Parsez[SVal] = for {
+    lazy val parseParenDottedList: Parsez[SVal] = for {
       _ <- char('(')
       x <- parseDottedList
       _ <- char(')')
@@ -87,31 +86,20 @@ object SchelaParse {
    Functions for preprocessing text before running it through the parser
    ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** **/
 
-  // TODO: is this what Lenses are for?
-  private def toNextQuote(text: S): (S, S) = text match {
-    case Nil => (Nil, Nil)
-    case '\\' +: escaped +: cs =>
-      val (acc, rest) = toNextQuote(cs)
-      ('\\' +: escaped +: acc, rest)
-    case '"' :: cs => (Nil, cs)
-    case c :: cs =>
-      val (acc, rest) = toNextQuote(cs)
-      (c +: acc, rest)
+  // todo: queue and tailrec
+  @tailrec
+  def deleteComments(text: S, q: Queue[Char] = Queue(), quote: Boolean = false): S = text match {
+    case Nil => q
+    case '\\' +: escaped +: cs => deleteComments(cs, q :+ '\\' :+ escaped, quote)
+    case '"' +: cs =>deleteComments(cs, q :+ '"', !quote)
+    case ';' +: cs if !quote =>
+      val commentDeleted = cs.dropWhile(!List('\n', '\r').contains(_))
+      deleteComments(commentDeleted, q, quote)
+    case c +: cs => deleteComments(cs, q :+ c, quote)
   }
 
-  def deleteComments(text: S): S = text match {
-    case Nil => Nil
-    case '"' +: cs =>
-      val (fromQuote, afterQuote) = toNextQuote(cs)
-      ('"' +: fromQuote) ++ ('"' +: deleteComments(afterQuote))
-    case ';' +: cs => cs.dropWhile(!Set('\n', '\r').contains(_)) match {
-      case Nil => Nil
-      case rest => deleteComments(rest)
-    }
-    case c +: cs => c +: deleteComments(cs)
-  }
-
-  def parensMatch(text: S, stack: List[Char]): Boolean = (text, stack) match {
+  @tailrec
+  def parensMatch(text: S, stack: List[Char] = Nil): Boolean = (text, stack) match {
     case ('(' +: xs, _) => parensMatch(xs, '(' :: stack)
     case ('[' +: xs, _) => parensMatch(xs, '[' :: stack)
     case (')' +: xs, '(' :: ss) => parensMatch(xs, ss)
@@ -123,7 +111,7 @@ object SchelaParse {
     case _ => false
   }
 
-  def assimilateParens(text: S): S = text.map {
+  def roundifyParens(text: S): S = text.map {
     case '[' => '('
     case ']' => ')'
     case c => c

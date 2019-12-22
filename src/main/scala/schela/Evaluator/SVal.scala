@@ -11,10 +11,6 @@ object SVal {
     override def shows(f: SVal): String = f match {
       case SAtom(name) => name.mkString
 
-      case SList(vs) => s"(${vs.map(shows).mkString(" ")})"
-
-      case SDottedList(vs, v) => s"(${vs.map(shows).mkString(" ")} . ${shows(v)})"
-
       case SNumber(n) => n.toString
 
       case SChar(' ') => "#\\space"
@@ -25,6 +21,12 @@ object SVal {
 
       case SBool(true) => "#t"
       case SBool(false) => "#f"
+
+      case SList(vs) => s"(${vs.map(shows).mkString(" ")})"
+
+      case SDottedList(vs, v) => s"(${vs.map(shows).mkString(" ")} . ${shows(v)})"
+
+      case SStruct(name, args) => s"($name ${args.map(shows).mkString(" ")})"
 
       case SPrimitiveFunc(_) => "<primitive>"
 
@@ -46,6 +48,7 @@ final case class SString(s: S) extends SVal
 final case class SBool(b: Boolean) extends SVal
 final case class SList(vs: List[SVal]) extends SVal
 final case class SDottedList(vs: List[SVal], v: SVal) extends SVal
+final case class SStruct(name: String, args: List[SVal]) extends SVal
 final case class SPrimitiveFunc(f: List[SVal] => ThrowsError[SVal]) extends SVal
 final case class SFunc(
   name: Option[String],
