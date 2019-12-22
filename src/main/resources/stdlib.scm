@@ -180,3 +180,7 @@
 (define (all pred . xs) (foldl (lambda (a c) (&& (pred c) a)) #t xs))
 
 (define (any pred . xs) (foldl (lambda (a c) (|| (pred c) a)) #f xs))
+
+;; strict Y combinator
+(define Y (lambda (f) ((lambda (x) (f (lambda (v) ((x x) v))))
+                       (lambda (x) (f (lambda (v) ((x x) v)))))))

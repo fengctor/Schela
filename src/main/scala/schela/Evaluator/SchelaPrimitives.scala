@@ -1,30 +1,30 @@
 package schela
 
 import scalaz.Scalaz._
-import scalaz.{Foldable, IList, Monoid, NonEmptyList}
+import scalaz.IList
 import Types._
 
 object SchelaPrimitives {
 
-  private def isSymbol(v: List[SVal]): ThrowsError[SVal] = v match {
+  private def isSymbol(v: List[SVal]): ThrowsError[SBool] = v match {
     case List(SAtom(_)) => SBool(true).point[ThrowsError]
     case List(_) => SBool(false).point[ThrowsError]
     case given => NumArgs(1, given).raiseError
   }
 
-  private def isString(v: List[SVal]): ThrowsError[SVal] = v match {
+  private def isString(v: List[SVal]): ThrowsError[SBool] = v match {
     case List(SString(_)) => SBool(true).point[ThrowsError]
     case List(_) => SBool(false).point[ThrowsError]
     case given => NumArgs(1, given).raiseError
   }
 
-  private def isNumber(v: List[SVal]): ThrowsError[SVal] = v match {
+  private def isNumber(v: List[SVal]): ThrowsError[SBool] = v match {
     case List(SNumber(_)) => SBool(true).point[ThrowsError]
     case List(_) => SBool(false).point[ThrowsError]
     case given => NumArgs(1, given).raiseError
   }
 
-  private def isList(v: List[SVal]): ThrowsError[SVal] = v match {
+  private def isList(v: List[SVal]): ThrowsError[SBool] = v match {
     case List(SList(_)) => SBool(true).point[ThrowsError]
     case List(SDottedList(_, _)) => SBool(true).point[ThrowsError]
     case List(_) => SBool(false).point[ThrowsError]
@@ -44,7 +44,7 @@ object SchelaPrimitives {
     case notBool => TypeMismatch("bool", notBool).raiseError
   }
 
-  def numBinop(op: (Int, Int) => Int)(args: List[SVal]): ThrowsError[SVal] = args match {
+  def numBinop(op: (Int, Int) => Int)(args: List[SVal]): ThrowsError[SNumber] = args match {
     case arg1 :: arg2 :: rest =>
       args.map(unwrapNum).sequence >>= (as => SNumber(as.foldl1Opt(op.curried).get).point[ThrowsError])
 
@@ -54,7 +54,7 @@ object SchelaPrimitives {
   def boolBinop[A](
     unwrapper: SVal => ThrowsError[A],
     op: (A, A) => Boolean
-  )(args: List[SVal]): ThrowsError[SVal] = args match {
+  )(args: List[SVal]): ThrowsError[SBool] = args match {
     case List(arg1, arg2) => for {
       l <- unwrapper(arg1)
       r <- unwrapper(arg2)
@@ -82,7 +82,7 @@ object SchelaPrimitives {
     case argsMismatch => NumArgs(2, argsMismatch).raiseError
   }
 
-  private def strAppend(args: List[SVal]): ThrowsError[SVal] = args match {
+  private def strAppend(args: List[SVal]): ThrowsError[SString] = args match {
     case str1 :: str2 :: rest =>
       IList.fromList(args)  // compiler thinks I want to use Iterable.fold if using a normal list...
         .traverse {
@@ -94,7 +94,7 @@ object SchelaPrimitives {
     case _ => NumArgs(2, args).raiseError
   }
 
-  private def eqv(args: List[SVal]): ThrowsError[SVal] = args match {
+  private def eqv(args: List[SVal]): ThrowsError[SBool] = args match {
     case List(SAtom(a1), SAtom(a2)) =>
       SBool(a1 === a2).point[ThrowsError]
 
@@ -134,7 +134,7 @@ object SchelaPrimitives {
     "+"         -> numBinop(_ + _),
     "-"         -> numBinop(_ - _),
     "*"         -> numBinop(_ * _),
-    "/"         -> numBinop(_ / _), // make behaviour like haskell div later
+    "/"         -> numBinop(_ / _), // TODO: make behaviour like haskell div
     "mod"       -> numBinop((x, n) => (x % n + n) % n),
     "quotient"  -> numBinop(_ / _),
     "remainder" -> numBinop(_ % _),

@@ -21,6 +21,10 @@ object SchelaEval {
     Map.empty
   )
 
+  // patterns
+  val `consPat`: List[Char] = "cons".toList
+  val `listPat`: List[Char] = "list".toList
+
   def getVar(name: String, env: Env): ThrowsError[SVal] =
     env.getBinding(name) match {
       case None        => UnboundVar("Getting an unbound variable", name).raiseError
@@ -29,7 +33,11 @@ object SchelaEval {
 
   // in case I ever want to fail defining a variable
   def defineVar(name: String, value: SVal, env: Env): ThrowsError[Env] = {
-    env.withBinding(name, value).point[ThrowsError]
+    if (allKeywords.contains(name.toList)) {
+      KeywordShadowing(name).raiseError
+    } else {
+      env.withBinding(name, value).point[ThrowsError]
+    }
   }
 
   def bindVars(vs: List[(String, SVal)], env: Env): ThrowsError[Env] =
@@ -44,7 +52,6 @@ object SchelaEval {
     case (SChar(patC), SChar(exprC))     if patC === exprC => env.some
     case (SString(patS), SString(exprS)) if patS === exprS => env.some
     case (SBool(patB), SBool(exprB))     if patB === exprB => env.some
-    case (SList(patL), SList(exprL))     if patL === exprL => env.some
     case _ => none
   }
 
@@ -57,22 +64,26 @@ object SchelaEval {
     case (SList(List(SAtom(`consPat`), headPat, tailPat)), SList(x :: xs)) =>
       matchAttempt(headPat, x, env) >>= (matchAttempt(tailPat, SList(xs), _))
     case (SList(SAtom(`listPat`) :: patList), SList(exprList)) if patList.size === exprList.size =>
-      patList.zip(exprList).foldl(env.some) { accEnv =>
-        { case (curPat, curExpr) => accEnv >>= (matchAttempt(curPat, curExpr, _)) }
+      patList.zip(exprList).foldLeft(env.some) {
+        case (accEnv, (curPat, curExpr)) => accEnv >>= (matchAttempt(curPat, curExpr, _))
       }
     case (quoted@SList(SAtom(`quote`) :: _), _) =>
-      eval(quoted, env).toOption >>= { case (evalPat, evalEnv) => literalMatchAttempt(evalPat, expr, evalEnv) }
+      eval(quoted, env).toOption >>= {
+        case (evalPat, evalEnv) => literalMatchAttempt(evalPat, expr, evalEnv)
+      }
+
+    // struct patterns
+    case (SList(SAtom(possibleStruct) :: argsPat), SStruct(name, args))
+      if argsPat.size === args.size && possibleStruct === name =>
+      argsPat.zip(args).foldLeft(env.some) {
+        case (accEnv, (curPat, curExpr)) => accEnv >>= (matchAttempt(curPat, curExpr, _))
+      }
 
     // literal patterns
     case (_, _) => literalMatchAttempt(pattern, expr, env)
   }
 
-  def fileParseAttempt(
-    fileStr: String,
-    parser: Parsez[List[SVal]],
-    input: S,
-    env: Env
-  ): ThrowsError[(SVal, Env)] = {
+  def fileParseAttempt(fileStr: String, parser: Parsez[List[SVal]], input: S, env: Env): ThrowsError[(SVal, Env)] = {
     val commentsRemoved = deleteComments(input)
 
     if (parensMatch(commentsRemoved)) {
@@ -155,30 +166,41 @@ object SchelaEval {
     case Right(v) => v
   }
 
-  def evalCond(clauses: List[SVal], env: Env): ThrowsError[(SVal, Env)] = clauses match {
+  def evalCond(clauses: List[SVal], env: Env): ThrowsError[SVal] = clauses match {
     case Nil =>
-      (SUnit(), env).point[ThrowsError] // TODO: cond error
+      SUnit().point[ThrowsError]
 
     case SList(List(SAtom(`else`), result)) :: _ =>
-      eval(result, env)
+      eval(result, env).map(_._1)
 
     case SList(List(pred, result)) :: restClauses =>
       eval(pred, env) >>= {
-        case (SBool(true), resEnv) => eval(result, resEnv)
+        case (SBool(true), resEnv) => eval(result, resEnv).map(_._1)
         case (SBool(false), resEnv) => evalCond(restClauses, resEnv)
         case _ => TypeMismatch("bool", pred).raiseError
       }
-    case badForm :: _ => BadSpecialForm("Invalid cond clause", badForm).raiseError
+    case badForm :: _ => BadSpecialForm("Malformed cond clause", badForm).raiseError
   }
 
   // expr must already be evaluated
-  def evalMatch(expr: SVal, clauses: List[SVal], env: Env): ThrowsError[(SVal, Env)] = clauses match {
+  def evalMatch(expr: SVal, clauses: List[SVal], env: Env): ThrowsError[SVal] = clauses match {
     case Nil => MatchFailure("No match found", expr).raiseError
     case SList(List(pattern, result)) :: rest => matchAttempt(pattern, expr, env) match {
       case None => evalMatch(expr, rest, env)
-      case Some(matchEnv) => eval(result, matchEnv)
+      case Some(matchEnv) => eval(result, matchEnv).map(_._1)
     }
-    case badForm :: _ => BadSpecialForm("Invalid match clause", badForm).raiseError
+    case badForm :: _ => BadSpecialForm("Malformed match clause", badForm).raiseError
+  }
+
+  def evalLet(bindings: List[SVal], body: SVal, env: Env): ThrowsError[SVal] = bindings match {
+    case Nil => eval(body, env).map(_._1)
+    case SList(List(SAtom(name), form)) :: otherBindings =>
+      eval(form, env) >>= {
+        case (value, newEnv) => defineVar(name.mkString, value, newEnv) >>= {
+          evalLet(otherBindings, body, _)
+        }
+      }
+    case badClause :: _ => BadSpecialForm("Malformed let clause", badClause).raiseError
   }
 
   def validateParams(params: List[SVal]): ThrowsError[List[SVal]] =
@@ -237,23 +259,18 @@ object SchelaEval {
       }
 
     case SList(SAtom(`cond`) :: clauses) =>
-      evalCond(clauses, env)
+      evalCond(clauses, env).map((_, env))
 
     case SList(SAtom(`match`) :: expr :: clauses) =>
-      eval(expr, env) >>= { case (evalExpr, newEnv) => evalMatch(evalExpr, clauses, newEnv) }
+      eval(expr, env) >>= {
+        case (evalExpr, newEnv) => evalMatch(evalExpr, clauses, newEnv).map((_, newEnv))
+      }
+
+    case SList(List(SAtom(`let`), SList(bindings), body)) =>
+      evalLet(bindings, body, env).map((_, env))
 
     case SList(List(SAtom(`load`), SString(fileName))) =>
       loadFile(fileName, env)
-
-    case SList(List(SAtom(`let`), SList(Nil), body)) =>
-      eval(body, env)
-
-    case SList(List(SAtom(`let`), SList(SList(List(SAtom(name), form)) :: otherBindings), body)) =>
-      eval(form, env) >>= {
-        case (value, newEnv) => defineVar(name.mkString, value, newEnv) >>= {
-          eval(SList(List(SAtom(`let`), SList(otherBindings), body)), _)
-        }
-      }
 
     case SList(List(SAtom(`define`), SAtom(name), form)) =>
       for {
@@ -286,6 +303,8 @@ object SchelaEval {
       (SFunc(none, List.empty, Some((varargs: SVal).shows), body, env), env).point[ThrowsError]
 
     case SList(f :: args) =>
+      // TODO: maybe some kind of mixed priority monoid?
+      //   (ie: if struct defn exists but wrong number of args, take that error)
       attemptStructConstruction(f, args, env).map((_, env)) |+| attemptFunctionApplication(f, args, env)
 
     case badForm => BadSpecialForm("Unrecognized special form", badForm).raiseError
