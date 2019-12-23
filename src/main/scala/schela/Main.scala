@@ -6,10 +6,8 @@ import scalaz._
 import Scalaz._
 
 import Parsez._
-
 import SchelaEval._
 import SchelaParse._
-
 import Types._
 
 object Main extends Repl {

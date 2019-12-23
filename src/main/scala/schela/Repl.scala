@@ -1,5 +1,7 @@
 package schela
 
+import scala.annotation.tailrec
+
 import scalaz._
 import Scalaz._
 
@@ -8,7 +10,6 @@ import SchelaEval._
 import SchelaParse._
 import Types._
 
-import scala.annotation.tailrec
 
 trait Repl {
   def readExpr(s: List[Char]): ThrowsError[SVal] = {

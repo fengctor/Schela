@@ -2,6 +2,7 @@ package schela
 
 import scalaz.Scalaz._
 import scalaz.IList
+
 import Types._
 
 object SchelaPrimitives {

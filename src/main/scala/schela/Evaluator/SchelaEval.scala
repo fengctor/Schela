@@ -2,15 +2,16 @@ package schela
 
 import java.io.FileNotFoundException
 
+import scala.io.BufferedSource
+
 import scalaz._
 import Scalaz._
+
 import Parsez._
 import SchelaParse._
 import SchelaPrimitives._
 import SchelaKeywords._
 import Types._
-
-import scala.io.BufferedSource
 
 object SchelaEval {
 
