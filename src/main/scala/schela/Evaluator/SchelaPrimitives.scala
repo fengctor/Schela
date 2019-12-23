@@ -82,7 +82,15 @@ object SchelaPrimitives {
     case argsMismatch => NumArgs(2, argsMismatch).raiseError
   }
 
-  private def strAppend(args: List[SVal]): ThrowsError[SString] = args match {
+  private def stringFromChars(args: List[SVal]): ThrowsError[SString] =
+    args.foldRight(Seq.empty[Char].point[ThrowsError]) { (c, r) =>
+      c match {
+        case SChar(char) => r.map(char +: _)
+        case _ => TypeMismatch("character", c).raiseError
+      }
+    }.map(SString(_))
+
+  private def stringAppend(args: List[SVal]): ThrowsError[SString] = args match {
     case str1 :: str2 :: rest =>
       IList.fromList(args)  // compiler thinks I want to use Iterable.fold if using a normal list...
         .traverse {
@@ -92,6 +100,32 @@ object SchelaPrimitives {
         .map(strs => SString(strs.fold))
 
     case _ => NumArgs(2, args).raiseError
+  }
+
+  private def stringLength(args: List[SVal]): ThrowsError[SNumber] = args match {
+    case List(SString(s)) => SNumber(s.length).point[ThrowsError]
+    case List(invalid) => TypeMismatch("string", invalid).raiseError
+    case _ => NumArgs(1, args).raiseError
+  }
+
+  private def substring(args: List[SVal]): ThrowsError[SString] = {
+    def getSubstring(str: String, start: Int, endOpt: Option[Int]): ThrowsError[SString] = {
+      val end = endOpt.getOrElse(str.length)
+
+      if (start >= 0 && end <= str.length && start <= end) {
+        SString(str.substring(start, end)).point[ThrowsError]
+      } else {
+        BadSpecialForm(s"Invalid substring bounds of [$start, $end]", SString(str)).raiseError
+      }
+    }
+    args match {
+      case List(SString(str), SNumber(start)) => getSubstring(str.mkString, start, none)
+      case List(SString(_), notNumber) => TypeMismatch("number", notNumber).raiseError
+      case List(SString(str), SNumber(start), SNumber(end)) => getSubstring(str.mkString, start, end.some)
+      case List(SString(_), SNumber(_), notNumber) => TypeMismatch("number", notNumber).raiseError
+      case List(SString(_), notNumber, _) => TypeMismatch("number", notNumber).raiseError
+      case _ => NumArgs(3, args).raiseError
+    }
   }
 
   private def eqv(args: List[SVal]): ThrowsError[SBool] = args match {
@@ -165,6 +199,9 @@ object SchelaPrimitives {
     "cdr"  -> cdr,
     "cons" -> cons,
     // string primitives
-    "str-append" -> strAppend
+    "string" -> stringFromChars,
+    "string-append" -> stringAppend,
+    "string-length" -> stringLength,
+    "substring" -> substring
   )
 }

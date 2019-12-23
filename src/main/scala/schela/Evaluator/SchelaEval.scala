@@ -195,11 +195,11 @@ object SchelaEval {
   def evalLet(bindings: List[SVal], body: SVal, env: Env): ThrowsError[SVal] = bindings match {
     case Nil => eval(body, env).map(_._1)
     case SList(List(SAtom(name), form)) :: otherBindings =>
-      eval(form, env) >>= {
-        case (value, newEnv) => defineVar(name.mkString, value, newEnv) >>= {
-          evalLet(otherBindings, body, _)
-        }
-      }
+      for {
+        (value, newEnv) <- eval(form, env)
+        boundVarEnv     <- defineVar(name.mkString, value, newEnv)
+        result          <- evalLet(otherBindings, body, boundVarEnv)
+      } yield result
     case badClause :: _ => BadSpecialForm("Malformed let clause", badClause).raiseError
   }
 
