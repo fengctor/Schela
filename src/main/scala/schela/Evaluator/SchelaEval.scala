@@ -26,13 +26,8 @@ object SchelaEval {
   val `consPat`: List[Char] = "cons".toList
   val `listPat`: List[Char] = "list".toList
 
-  def getVar(name: String, env: Env): ThrowsError[SVal] =
-    env.getBinding(name) match {
-      case None        => UnboundVar("Getting an unbound variable", name).raiseError
-      case Some(value) => value.point[ThrowsError]
-    }
+  def getVar(name: String, env: Env): ThrowsError[SVal] = env.getBinding(name)
 
-  // in case I ever want to fail defining a variable
   def defineVar(name: String, value: SVal, env: Env): ThrowsError[Env] = {
     if (allKeywords.contains(name.toList)) {
       KeywordShadowing(name).raiseError
@@ -204,7 +199,7 @@ object SchelaEval {
     case badClause :: _ => BadSpecialForm("Malformed let clause", badClause).raiseError
   }
 
-  def validateParams(params: List[SVal]): ThrowsError[List[SVal]] =
+  def validateParams(params: List[SVal]): ThrowsError[List[SAtom]] =
     params.traverse {
       case atom@SAtom(_) => atom.point[ThrowsError]
       case badParam => BadSpecialForm("Invalid param", badParam).raiseError
@@ -213,15 +208,16 @@ object SchelaEval {
   def attemptStructConstruction(s: SVal, args: List[SVal], env: Env): ThrowsError[SVal] = s match {
     case SAtom(name) =>
       val nameStr = name.mkString
-      env.getStruct(nameStr) match {
-        case None => BadSpecialForm("Not a struct", s).raiseError
-        case Some(numParams) =>
+      for {
+        numParams <- env.getStruct(nameStr)
+        evalArgs  <- args.map(eval(_, env).map(_._1)).sequence
+        result    <-
           if (numParams === args.size) {
-            SStruct(nameStr, args).point[ThrowsError]
+            SStruct(nameStr, evalArgs).point[ThrowsError]
           } else {
-            NumArgs(numParams, args).raiseError
+            NumArgs(numParams, evalArgs).raiseError
           }
-      }
+      } yield result
 
     case _ => BadSpecialForm("Not a struct", s).raiseError
   }
@@ -229,8 +225,8 @@ object SchelaEval {
   def attemptFunctionApplication(f: SVal, args: List[SVal], env: Env): ThrowsError[(SVal, Env)] =
     for {
       (func, newEnv) <- eval(f, env)
-      argValues <- args.map(eval(_, newEnv).map(_._1)).sequence
-      result <- apply(func, argValues)
+      argValues      <- args.map(eval(_, newEnv).map(_._1)).sequence
+      result         <- apply(func, argValues)
     } yield (result, env)
 
   def eval(v: SVal, env: Env): ThrowsError[(SVal, Env)] = v match {
@@ -291,7 +287,7 @@ object SchelaEval {
 
     case SList(List(SAtom(`struct`), SAtom(name), SList(givenParams))) =>
       validateParams(givenParams).map { params =>
-        (SUnit(), env.withStruct(name.mkString, params.size))
+        (SUnit(), env.withStruct(name.mkString, params.map(_.name.mkString)))
       }
 
     case SList(SAtom(`lambda`) :: SList(params) :: body) =>

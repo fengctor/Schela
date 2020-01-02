@@ -90,7 +90,7 @@ SET PSEP=;
 
 @REM Start Java program
 :runm2
-SET CMDLINE=%JAVA_EXE% "-Xss512M" "-Xms2G" "-Xmx4G" %JAVA_OPTS% -cp "%PROG_HOME%\lib\*;"  -Dprog.home="%PROG_HOME%" -Dprog.version="0.1" -Dprog.revision="641e05fed9422a93633b2f6695e00b930cc4bd7a" schela.Main %CMD_LINE_ARGS%
+SET CMDLINE=%JAVA_EXE% "-Xss512M" "-Xms2G" "-Xmx4G" %JAVA_OPTS% -cp "%PROG_HOME%\lib\*;"  -Dprog.home="%PROG_HOME%" -Dprog.version="0.1" -Dprog.revision="777df8cc8d22d59ca2e06b7a459840e9a2a7d9ad" schela.Main %CMD_LINE_ARGS%
 %CMDLINE%
 if ERRORLEVEL 1 goto error
 goto end

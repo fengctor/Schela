@@ -1,21 +1,38 @@
 package schela
 
-import scalaz.{Equal, Monoid, Semigroup}
+import scalaz._
+import Scalaz._
 
 object Types {
   type S = Seq[Char]
   type ThrowsError[+A] = Either[SError, A]
-  //type Env = Map[String, SVal]
 
   final case class Env(bindings: Map[String, SVal], structs: Map[String, Int]) {
 
     def withBinding(name: String, value: SVal): Env = Env(bindings + (name -> value), structs)
 
-    def getBinding(name: String): Option[SVal] = bindings.get(name)
+    def getBinding(name: String): ThrowsError[SVal] = bindings.get(name) match {
+      case None        => UnboundVar("Getting an unbound variable", name).raiseError
+      case Some(value) => value.point[ThrowsError]
+    }
 
-    def withStruct(name: String, numParams: Int): Env = Env(bindings, structs + (name -> numParams))
+    def withStruct(name: String, params: List[String]): Env = Env(
+      bindings ++ params.map { paramName =>
+        val getterName = s"$name-$paramName"
+        (getterName, SFunc(getterName.some, List("arg"), none,
+          List(Parsez.runParser(SchelaParse.parseExpr,
+            s"(match arg (($name ${params.mkString(" ")}) $paramName))".toSeq
+          ).getOrElse(SUnit())),
+          this
+        ))
+      },
+      structs + (name -> params.size)
+    )
 
-    def getStruct(name: String): Option[Int] = structs.get(name)
+    def getStruct(name: String): ThrowsError[Int] = structs.get(name) match {
+      case None => BadSpecialForm("Not a struct", SAtom(name)).raiseError
+      case Some(n) => Right(n)
+    }
   }
 
   implicit def SeqEqual[A](implicit eqA: Equal[A]): Equal[Seq[A]] = Equal.equalA
