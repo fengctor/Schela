@@ -26,6 +26,7 @@ object SVal {
 
       case SDottedList(vs, v) => s"(${vs.map(shows).mkString(" ")} . ${shows(v)})"
 
+      case SStruct(name, Nil) => name
       case SStruct(name, args) => s"($name ${args.map(shows).mkString(" ")})"
 
       case SPrimitiveFunc(_) => "<primitive>"

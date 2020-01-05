@@ -130,7 +130,7 @@ fi
 
 PROG_NAME=schela
 PROG_VERSION=0.1
-PROG_REVISION=777df8cc8d22d59ca2e06b7a459840e9a2a7d9ad
+PROG_REVISION=eebd11bb10fdb82ecd7907d1fb5aa61a806dc89d
 
 for arg do
   shift

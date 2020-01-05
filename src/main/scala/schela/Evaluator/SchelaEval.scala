@@ -243,7 +243,11 @@ object SchelaEval {
       (v, env).point[ThrowsError]
 
     case SAtom(name) =>
-      getVar(name.mkString, env).map((_, env))
+      val nameStr = name.mkString
+      ((env.getStruct(nameStr) >>= {
+        case 0 => (SStruct(nameStr, Nil): SVal).point[ThrowsError]
+        case _ => BadSpecialForm("Not a struct", SAtom(name)).raiseError
+      }) |+| getVar(nameStr, env)).map((_, env))
 
     case SList(List(SAtom(`quote`), x: SVal)) =>
       (x, env).point[ThrowsError]
@@ -285,6 +289,8 @@ object SchelaEval {
       defineVar(fName, SFunc(fName.some, params.map(_.shows), Some(varargs.shows), body, env), env)
         .map((SUnit(), _))
 
+    case SList(List(SAtom(`struct`), SAtom(name))) =>
+      (SUnit(), env.withStruct(name.mkString, Nil)).point[ThrowsError]
     case SList(List(SAtom(`struct`), SAtom(name), SList(givenParams))) =>
       validateParams(givenParams).map { params =>
         (SUnit(), env.withStruct(name.mkString, params.map(_.name.mkString)))
