@@ -1,4 +1,3 @@
-; hi
 (define (filterM pred lst) ;; comment here
   (match lst ;; comment (there))))
     [() '(())]
@@ -7,10 +6,6 @@
                 ((if b (curry map (curry cons x)) id)
                  (filterM pred xs)))
               (pred x))]))
-
-;; strict Y combinator
-(define Y (lambda (f) ((lambda (x) (f (lambda (v) ((x x) v))))
-                       (lambda (x) (f (lambda (v) ((x x) v)))))))
 
 (define Fact
   (Y (lambda (fac) (lambda (n) (if (zero? n) 1 (* n (fac (- n 1))))))))
